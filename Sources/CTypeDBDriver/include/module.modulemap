@@ -1,0 +1,5 @@
+module CTypeDBDriver [system] {
+    header "typedb_driver.h"
+    link "typedb_driver_clib"
+    export *
+}

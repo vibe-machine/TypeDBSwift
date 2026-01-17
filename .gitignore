@@ -1,0 +1,39 @@
+# Build artifacts
+.build/
+.swiftpm/
+DerivedData/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+
+# Package resolved (comment out if you want to lock dependencies)
+# Package.resolved
+
+# Xcode
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Temporary files
+*.tmp
+.tmp-*/
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+
+# Coverage
+*.profdata
+*.profraw
+
+# Don't track the dylib - fetch it with scripts/fetch-driver.sh
+# Uncomment these lines if you want to require users to fetch the driver
+# Sources/CTypeDBDriver/lib/*.dylib
+# Sources/CTypeDBDriver/lib/*.so
+# Sources/CTypeDBDriver/lib/*.dll
