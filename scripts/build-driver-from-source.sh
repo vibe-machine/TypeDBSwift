@@ -68,12 +68,12 @@ case "$(uname -s)" in
         case "$(uname -m)" in
             arm64)
                 TARGET="//c:typedb_driver_clib_headers"
-                LIB_TARGET="//c:typedb_driver_clib"
+                LIB_TARGET="//c:typedb-driver-clib"
                 LIB_NAME="libtypedb_driver_clib.dylib"
                 ;;
             x86_64)
                 TARGET="//c:typedb_driver_clib_headers"
-                LIB_TARGET="//c:typedb_driver_clib"
+                LIB_TARGET="//c:typedb-driver-clib"
                 LIB_NAME="libtypedb_driver_clib.dylib"
                 ;;
             *)
@@ -84,7 +84,7 @@ case "$(uname -s)" in
         ;;
     Linux)
         TARGET="//c:typedb_driver_clib_headers"
-        LIB_TARGET="//c:typedb_driver_clib"
+        LIB_TARGET="//c:typedb-driver-clib"
         LIB_NAME="libtypedb_driver_clib.so"
         ;;
     *)
@@ -93,12 +93,15 @@ case "$(uname -s)" in
         ;;
 esac
 
+# Workaround for macOS Bazel bug: wrapped_clang missing LC_UUID load command
+BAZEL_OPTS="--action_env=BAZEL_USE_CPP_ONLY_TOOLCHAIN=1"
+
 echo "Building C driver library..."
-bazel build "$LIB_TARGET"
+bazel build $BAZEL_OPTS "$LIB_TARGET"
 
 echo ""
 echo "Building C driver headers..."
-bazel build "$TARGET"
+bazel build $BAZEL_OPTS "$TARGET"
 
 # Find built artifacts
 echo ""
