@@ -1,0 +1,3 @@
+[submodule "vendor/typedb-driver"]
+	path = vendor/typedb-driver
+	url = https://github.com/typedb/typedb-driver.git

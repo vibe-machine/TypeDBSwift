@@ -9,9 +9,26 @@ Transaction and query APIs are not yet implemented.
 
 ## Requirements
 
-- macOS 13.0+ (arm64)
+- macOS 13.0+ (arm64 or x86_64)
 - Swift 5.9+
 - TypeDB server 3.7.0+
+
+## Quick Start
+
+```bash
+# Clone the repository
+git clone https://github.com/yourorg/TypeDBSwift.git
+cd TypeDBSwift
+
+# Fetch the pre-built C driver
+./scripts/fetch-driver.sh
+
+# Build
+swift build
+
+# Run tests (requires TypeDB server at localhost:1729)
+./scripts/test.sh
+```
 
 ## Project Structure
 
@@ -19,48 +36,51 @@ Transaction and query APIs are not yet implemented.
 TypeDBSwift/
 ├── Package.swift                 # Swift Package Manager manifest
 ├── README.md                     # This file
+├── BUILDING.md                   # Detailed build documentation
 ├── Sources/
 │   ├── CTypeDBDriver/            # C driver bindings
 │   │   ├── include/
 │   │   │   ├── module.modulemap  # Swift module map for C library
 │   │   │   └── typedb_driver.h   # TypeDB C driver header
 │   │   └── lib/
-│   │       └── libtypedb_driver_clib.dylib  # Pre-built native library
+│   │       └── libtypedb_driver_clib.dylib
 │   └── TypeDBSwift/              # Swift wrapper library
-│       ├── TypeDBSwift.swift     # Module entry point
-│       ├── TypeDBDriver.swift    # Main driver connection class
-│       ├── TypeDBError.swift     # Error handling
-│       └── DatabaseManager.swift # Database operations
-└── Tests/
-    └── TypeDBSwiftTests/         # Unit and integration tests
+├── Tests/
+│   └── TypeDBSwiftTests/         # Unit and integration tests
+├── scripts/
+│   ├── build.sh                  # Main build script
+│   ├── test.sh                   # Test runner with coverage
+│   ├── fetch-driver.sh           # Download pre-built C driver
+│   └── build-driver-from-source.sh  # Build C driver from source
+└── vendor/
+    └── typedb-driver/            # Git submodule (optional, for source builds)
 ```
 
 ## Building
 
-### Prerequisites
+For detailed build instructions, see [BUILDING.md](BUILDING.md).
 
-The project includes pre-built C driver artifacts for macOS arm64 (version 3.7.0).
-These were downloaded from the official TypeDB Cloudsmith repository.
-
-### Build with Swift Package Manager
+### Quick Build
 
 ```bash
-cd TypeDBSwift
+# Using the build script (fetches driver if needed)
+./scripts/build.sh
+
+# Or manually
+./scripts/fetch-driver.sh
 swift build
 ```
 
 ### Run Tests
 
-Unit tests (no server required):
 ```bash
-# Set library path for runtime linking
-DYLD_LIBRARY_PATH="$PWD/Sources/CTypeDBDriver/lib" swift test
-```
+# Using the test script
+./scripts/test.sh              # All tests
+./scripts/test.sh --unit       # Unit tests only (no server)
+./scripts/test.sh --coverage   # With code coverage
 
-Integration tests (requires running TypeDB server):
-```bash
-# Start TypeDB server first
-DYLD_LIBRARY_PATH="$PWD/Sources/CTypeDBDriver/lib" swift test --filter Integration
+# Or manually
+DYLD_LIBRARY_PATH="$PWD/Sources/CTypeDBDriver/lib" swift test
 ```
 
 ## Usage
@@ -138,24 +158,14 @@ The dylib must be findable at runtime. Options:
   install_name_tool -id @rpath/libtypedb_driver_clib.dylib libtypedb_driver_clib.dylib
   ```
 
-## C Driver Artifacts
+## C Driver
 
-The C driver artifacts were obtained from TypeDB's official release repository:
+The TypeDB C driver can be obtained in two ways:
 
-```bash
-curl -fLO https://repo.typedb.com/public/public-release/raw/names/typedb-driver-clib-mac-arm64/versions/3.7.0/typedb-driver-clib-mac-arm64-3.7.0.zip
-```
+1. **Pre-built binaries** (recommended): `./scripts/fetch-driver.sh`
+2. **Build from source**: `./scripts/build-driver-from-source.sh`
 
-To update to a newer version:
-
-1. Download the new artifacts and replace the files in
-   `Sources/CTypeDBDriver/include/` and `Sources/CTypeDBDriver/lib/`.
-
-2. Fix the dylib install name (the downloaded dylib has a Bazel build path):
-   ```bash
-   cd Sources/CTypeDBDriver/lib
-   install_name_tool -id @rpath/libtypedb_driver_clib.dylib libtypedb_driver_clib.dylib
-   ```
+See [BUILDING.md](BUILDING.md) for details on updating to newer versions.
 
 ## API Reference
 
@@ -197,9 +207,9 @@ To update to a newer version:
 
 ## Related Documentation
 
-- [TypeDB 3.7 gRPC Drivers Report](../GammaKit/docs/TypeDB_3_7_gRPC_Drivers_Report.md)
 - [TypeDB Documentation](https://typedb.com/docs)
 - [TypeDB Driver Repository](https://github.com/typedb/typedb-driver)
+- [BUILDING.md](BUILDING.md) - Detailed build instructions
 
 ## License
 
