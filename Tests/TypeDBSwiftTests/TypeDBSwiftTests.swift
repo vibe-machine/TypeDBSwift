@@ -250,6 +250,37 @@ final class TypeDBSwiftIntegrationTests: XCTestCase {
         XCTAssertFalse(exists)
     }
 
+    func testExportAndImportDatabase() throws {
+        let driver = try connect()
+        defer { driver.close() }
+
+        let sourceName = "swift_export_\(UUID().uuidString.prefix(8).lowercased())"
+        let targetName = "swift_import_\(UUID().uuidString.prefix(8).lowercased())"
+        let tempDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("typedbswift-export-\(UUID().uuidString)", isDirectory: true)
+        let schemaFile = tempDirectory.appendingPathComponent("schema.tql")
+        let dataFile = tempDirectory.appendingPathComponent("data.typedb")
+
+        try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+        defer {
+            try? driver.databases.get(sourceName).delete()
+            try? driver.databases.get(targetName).delete()
+            try? FileManager.default.removeItem(at: tempDirectory)
+        }
+
+        try driver.databases.create(sourceName)
+        let source = try driver.databases.get(sourceName)
+        try source.exportToFile(schemaFilePath: schemaFile.path, dataFilePath: dataFile.path)
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: schemaFile.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: dataFile.path))
+
+        let schema = try String(contentsOf: schemaFile, encoding: .utf8)
+        try driver.databases.importFromFile(name: targetName, schema: schema, dataFilePath: dataFile.path)
+
+        XCTAssertTrue(try driver.databases.contains(targetName))
+    }
+
     // MARK: - Multiple Operations
 
     func testMultipleDatabaseOperations() throws {

@@ -65,6 +65,22 @@ public final class DatabaseManager {
         try TypeDBError.checkAndThrow()
     }
 
+    /// Create a database by importing a previously exported schema and data file.
+    ///
+    /// - Parameters:
+    ///   - name: The name for the imported database
+    ///   - schema: The schema definition query string for the database
+    ///   - dataFilePath: The exported data file path to import
+    /// - Throws: `TypeDBError` if the import fails
+    public func importFromFile(name: String, schema: String, dataFilePath: String) throws {
+        guard let driverPtr = driver?.cPointer else {
+            throw TypeDBError(code: "DRIVER_CLOSED", message: "Driver connection is closed")
+        }
+
+        databases_import_from_file(driverPtr, name, schema, dataFilePath)
+        try TypeDBError.checkAndThrow()
+    }
+
     /// Get a database by name.
     ///
     /// - Parameter name: The database name
@@ -120,5 +136,20 @@ public final class Database {
         database_delete(ptr)
         try TypeDBError.checkAndThrow()
         pointer = nil
+    }
+
+    /// Export this database to schema and data files.
+    ///
+    /// - Parameters:
+    ///   - schemaFilePath: Path to the schema definition file to create
+    ///   - dataFilePath: Path to the data file to create
+    /// - Throws: `TypeDBError` if the export fails
+    public func exportToFile(schemaFilePath: String, dataFilePath: String) throws {
+        guard let ptr = pointer else {
+            throw TypeDBError(code: "DATABASE_CLOSED", message: "Database reference is invalid")
+        }
+
+        database_export_to_file(ptr, schemaFilePath, dataFilePath)
+        try TypeDBError.checkAndThrow()
     }
 }
