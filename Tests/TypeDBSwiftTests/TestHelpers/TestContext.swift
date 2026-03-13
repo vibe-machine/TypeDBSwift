@@ -1,3 +1,4 @@
+import Foundation
 import XCTest
 @testable import TypeDBSwift
 
@@ -9,7 +10,7 @@ class TestContext {
 
     // MARK: - Configuration
 
-    static let serverAddress = "localhost:1729"
+    static let serverAddress = ProcessInfo.processInfo.environment["TYPEDB_ADDRESS"] ?? "localhost:1729"
     static let defaultCredentials = TypeDBCredentials(username: "admin", password: "password")
 
     // MARK: - State
