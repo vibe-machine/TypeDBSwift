@@ -10,7 +10,7 @@ public struct TypeDBError: Error, CustomStringConvertible {
         "[\(code)] \(message)"
     }
 
-    init(code: String, message: String) {
+    public init(code: String, message: String) {
         self.code = code
         self.message = message
     }

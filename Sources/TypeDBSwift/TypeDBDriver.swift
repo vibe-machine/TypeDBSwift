@@ -45,6 +45,11 @@ public final class TypeDBDriver {
         DatabaseManager(driver: self)
     }()
 
+    /// The user manager for this connection.
+    public private(set) lazy var users: UserManager = {
+        UserManager(driver: self)
+    }()
+
     private init(pointer: OpaquePointer) {
         self.pointer = pointer
     }

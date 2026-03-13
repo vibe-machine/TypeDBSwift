@@ -1,3 +1,4 @@
+import Foundation
 import XCTest
 @testable import TypeDBSwift
 
@@ -102,7 +103,7 @@ final class TypeDBErrorTests: XCTestCase {
 
 final class TypeDBSwiftIntegrationTests: XCTestCase {
 
-    static let serverAddress = "localhost:1729"
+    static let serverAddress = ProcessInfo.processInfo.environment["TYPEDB_ADDRESS"] ?? "localhost:1729"
     // Default credentials for TypeDB 3.x
     static let defaultCredentials = TypeDBCredentials(username: "admin", password: "password")
 
