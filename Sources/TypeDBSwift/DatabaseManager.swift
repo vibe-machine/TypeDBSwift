@@ -152,4 +152,49 @@ public final class Database {
         database_export_to_file(ptr, schemaFilePath, dataFilePath)
         try TypeDBError.checkAndThrow()
     }
+
+    /// The full schema as a valid TypeQL define query string.
+    ///
+    /// Returns the complete schema definition including types and rules.
+    ///
+    /// - Returns: The schema as a TypeQL `define` query string
+    /// - Throws: `TypeDBError` if the operation fails
+    public func schema() throws -> String {
+        guard let ptr = pointer else {
+            throw TypeDBError(code: "DATABASE_CLOSED", message: "Database reference is invalid")
+        }
+
+        guard let schemaPtr = database_schema(ptr) else {
+            try TypeDBError.checkAndThrow()
+            throw TypeDBError(code: "SCHEMA_UNAVAILABLE", message: "Failed to retrieve schema")
+        }
+
+        let result = String(cString: schemaPtr)
+        string_free(schemaPtr)
+        try TypeDBError.checkAndThrow()
+        return result
+    }
+
+    /// The types in the schema as a valid TypeQL define query string.
+    ///
+    /// Returns only the type definitions (entities, relations, attributes),
+    /// excluding rules and other non-type schema elements.
+    ///
+    /// - Returns: The type schema as a TypeQL `define` query string
+    /// - Throws: `TypeDBError` if the operation fails
+    public func typeSchema() throws -> String {
+        guard let ptr = pointer else {
+            throw TypeDBError(code: "DATABASE_CLOSED", message: "Database reference is invalid")
+        }
+
+        guard let schemaPtr = database_type_schema(ptr) else {
+            try TypeDBError.checkAndThrow()
+            throw TypeDBError(code: "SCHEMA_UNAVAILABLE", message: "Failed to retrieve type schema")
+        }
+
+        let result = String(cString: schemaPtr)
+        string_free(schemaPtr)
+        try TypeDBError.checkAndThrow()
+        return result
+    }
 }
