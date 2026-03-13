@@ -1,11 +1,25 @@
 import Foundation
 
-// MARK: - Async dispatch helper
+// MARK: - Serial dispatch queue for C driver calls
 
-/// Dispatches a blocking operation off the cooperative thread pool.
+/// A dedicated serial queue that serializes all blocking C driver operations.
+///
+/// The TypeDB C driver is not thread-safe and its error handling uses global
+/// (thread-local) state. A serial queue guarantees that only one C call
+/// executes at a time, prevents thread explosion from concurrent async callers,
+/// and keeps blocking work off the Swift cooperative thread pool.
+///
+/// Modeled after GRDB's `SerializedDatabase` pattern — one serial queue per
+/// driver connection. Because we typically run a single connection and the
+/// C error state is global, a module-level queue is the right granularity.
+private let driverQueue = DispatchQueue(label: "com.typedbswift.driver", qos: .userInitiated)
+
+// MARK: - Async dispatch helpers
+
+/// Dispatches a blocking C driver operation on the dedicated serial queue.
 internal func dispatchBlocking<T: Sendable>(_ operation: @escaping @Sendable () throws -> T) async throws -> T {
     try await withCheckedThrowingContinuation { continuation in
-        DispatchQueue.global().async {
+        driverQueue.async {
             do {
                 let result = try operation()
                 continuation.resume(returning: result)
@@ -18,7 +32,7 @@ internal func dispatchBlocking<T: Sendable>(_ operation: @escaping @Sendable () 
 
 internal func dispatchBlockingVoid(_ operation: @escaping @Sendable () throws -> Void) async throws {
     try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-        DispatchQueue.global().async {
+        driverQueue.async {
             do {
                 try operation()
                 continuation.resume()
@@ -70,6 +84,16 @@ extension DatabaseManager {
     }
 }
 
+// MARK: - DatabaseManager + Import/Export Async
+
+extension DatabaseManager {
+
+    /// Create a database by importing a previously exported schema and data file.
+    public func importFromFile(name: String, schema: String, dataFilePath: String) async throws {
+        try await dispatchBlockingVoid { try self.importFromFile(name: name, schema: schema, dataFilePath: dataFilePath) }
+    }
+}
+
 // MARK: - Database + Async
 
 extension Database {
@@ -77,6 +101,21 @@ extension Database {
     /// Delete this database.
     public func delete() async throws {
         try await dispatchBlockingVoid { try self.delete() }
+    }
+
+    /// Export this database to schema and data files.
+    public func exportToFile(schemaFilePath: String, dataFilePath: String) async throws {
+        try await dispatchBlockingVoid { try self.exportToFile(schemaFilePath: schemaFilePath, dataFilePath: dataFilePath) }
+    }
+
+    /// The full schema as a valid TypeQL define query string.
+    public func schema() async throws -> String {
+        try await dispatchBlocking { try self.schema() as String }
+    }
+
+    /// The types in the schema as a valid TypeQL define query string.
+    public func typeSchema() async throws -> String {
+        try await dispatchBlocking { try self.typeSchema() as String }
     }
 }
 
