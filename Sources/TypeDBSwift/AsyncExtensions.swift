@@ -57,6 +57,23 @@ extension TypeDBDriver {
             try TypeDBDriver.connect(to: address, credentials: credentials, options: options)
         }
     }
+
+    /// Execute a TypeQL query asynchronously.
+    public func query(
+        _ query: String,
+        database: String,
+        transactionType: TypeDBQueryTransactionType,
+        commit: Bool? = nil
+    ) async throws -> TypeDBDriverQueryResult {
+        try await dispatchBlocking {
+            try self.query(
+                query,
+                database: database,
+                transactionType: transactionType,
+                commit: commit
+            )
+        }
+    }
 }
 
 // MARK: - DatabaseManager + Async
