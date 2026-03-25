@@ -2,12 +2,16 @@ import CTypeDBDriver
 import Foundation
 
 /// Errors that can occur when interacting with TypeDB.
-public struct TypeDBError: Error, CustomStringConvertible {
+public struct TypeDBError: Error, CustomStringConvertible, LocalizedError {
     public let code: String
     public let message: String
 
     public var description: String {
         "[\(code)] \(message)"
+    }
+
+    public var errorDescription: String? {
+        description
     }
 
     public init(code: String, message: String) {
