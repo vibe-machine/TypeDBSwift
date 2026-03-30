@@ -1,0 +1,147 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+syntax = "proto3";
+
+package typedb.protocol;
+
+message Concept {
+    oneof concept {
+        EntityType entity_type = 1;
+        RelationType relation_type = 2;
+        AttributeType attribute_type = 3;
+        RoleType role_type = 4;
+
+        Entity entity = 5;
+        Relation relation = 6;
+        Attribute attribute = 7;
+    }
+}
+
+message Thing {
+    oneof thing {
+        Entity entity = 1;
+        Relation relation = 2;
+        Attribute attribute = 3;
+    }
+}
+
+message Entity {
+    bytes iid = 1;
+    optional EntityType entity_type = 2;
+}
+
+message Relation {
+    bytes iid = 1;
+    optional RelationType relation_type = 2;
+}
+
+message Attribute {
+    bytes iid = 1;
+    optional AttributeType attribute_type = 2;
+    Value value = 3;
+}
+
+message Value {
+    oneof value {
+        bool boolean = 1;
+        sint64 integer = 2;
+        double double = 3;
+        Decimal decimal = 4;
+        string string = 5;
+        Date date = 6;
+        Datetime datetime = 7;
+        Datetime_TZ datetime_tz = 8;
+        Duration duration = 9;
+        Struct struct = 10;
+    }
+
+    message Decimal {
+        sint64 integer = 1;
+        uint64 fractional = 2;
+    }
+
+    message Date {
+        // days since January 1, 0001 as day 1 in the Gregorian Calendar (following Rust conventions)
+        sint32 num_days_since_ce = 1;
+    }
+
+    message Datetime {
+        // seconds since epoch
+        sint64 seconds = 1;
+        uint32 nanos = 2;
+    }
+
+    message Datetime_TZ {
+        Datetime datetime = 1;
+        oneof timezone {
+            string named = 2;
+            // offset in seconds
+            sint32 offset = 3;
+        }
+    }
+
+    message Duration {
+        uint32 months = 1;
+        uint32 days = 2;
+        uint64 nanos = 3;
+    }
+
+    message Struct {
+        string struct_type_name = 1;
+    }
+}
+
+message Type {
+    oneof type {
+        EntityType entity_type = 1;
+        RelationType relation_type = 2;
+        AttributeType attribute_type = 3;
+        RoleType role_type = 4;
+    }
+}
+
+message RoleType {
+    string label = 1;
+}
+
+message EntityType {
+    string label = 1;
+}
+
+message RelationType {
+    string label = 1;
+}
+
+message AttributeType {
+    string label = 1;
+    optional ValueType value_type = 2;
+}
+
+message ValueType {
+    oneof value_type {
+        Boolean boolean = 1;
+        Integer integer = 2;
+        Double double = 3;
+        Decimal decimal = 4;
+        String string = 5;
+        Date date = 6;
+        DateTime datetime = 7;
+        DateTime_TZ datetime_tz = 8;
+        Duration duration = 9;
+        Struct struct = 10;
+    }
+    message Boolean {};
+    message Integer {};
+    message Double {};
+    message Decimal {};
+    message String {};
+    message Date {};
+    message DateTime {};
+    message DateTime_TZ {};
+    message Duration {};
+    message Struct {
+        string name = 1;
+    };
+}

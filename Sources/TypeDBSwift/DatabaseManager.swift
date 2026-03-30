@@ -81,6 +81,35 @@ public final class DatabaseManager {
         try TypeDBError.checkAndThrow()
     }
 
+    /// Decode a previously exported schema and data file into typed migration records.
+    public func decodeExportFile(schemaFilePath: String, dataFilePath: String) throws -> TypeDBMigrationExport {
+        do {
+            return try TypeDBMigrationCodec.decodeExport(
+                schemaFileURL: URL(fileURLWithPath: schemaFilePath),
+                dataFileURL: URL(fileURLWithPath: dataFilePath)
+            )
+        } catch {
+            throw TypeDBError(code: "MIGRATION_DECODE_FAILED", message: "Failed to decode export file: \(error)")
+        }
+    }
+
+    /// Create a database from typed migration records.
+    public func importFromRecords(name: String, export: TypeDBMigrationExport) throws {
+        let temporaryExport = TemporaryMigrationFiles()
+        try temporaryExport.create()
+        defer { temporaryExport.cleanup() }
+
+        do {
+            try export.schema.write(to: temporaryExport.schemaFileURL, atomically: true, encoding: .utf8)
+            try TypeDBMigrationCodec.encodeDataFile(for: export).write(to: temporaryExport.dataFileURL)
+            try importFromFile(name: name, schema: export.schema, dataFilePath: temporaryExport.dataFileURL.path)
+        } catch let error as TypeDBError {
+            throw error
+        } catch {
+            throw TypeDBError(code: "MIGRATION_ENCODE_FAILED", message: "Failed to import migration records: \(error)")
+        }
+    }
+
     /// Get a database by name.
     ///
     /// - Parameter name: The database name
@@ -153,6 +182,26 @@ public final class Database {
         try TypeDBError.checkAndThrow()
     }
 
+    /// Export this database into a schema string plus typed migration records.
+    public func exportRecords() throws -> TypeDBMigrationExport {
+        let temporaryExport = TemporaryMigrationFiles()
+        try temporaryExport.create()
+        defer { temporaryExport.cleanup() }
+
+        do {
+            try exportToFile(
+                schemaFilePath: temporaryExport.schemaFileURL.path,
+                dataFilePath: temporaryExport.dataFileURL.path
+            )
+            return try TypeDBMigrationCodec.decodeExport(
+                schemaFileURL: temporaryExport.schemaFileURL,
+                dataFileURL: temporaryExport.dataFileURL
+            )
+        } catch {
+            throw TypeDBError(code: "MIGRATION_EXPORT_FAILED", message: "Failed to export migration records: \(error)")
+        }
+    }
+
     /// The full schema as a valid TypeQL define query string.
     ///
     /// Returns the complete schema definition including types and rules.
@@ -196,5 +245,26 @@ public final class Database {
         string_free(schemaPtr)
         try TypeDBError.checkAndThrow()
         return result
+    }
+}
+
+private struct TemporaryMigrationFiles {
+    let directoryURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent("typedbswift-migration-\(UUID().uuidString)", isDirectory: true)
+
+    var schemaFileURL: URL {
+        directoryURL.appendingPathComponent("schema.tql")
+    }
+
+    var dataFileURL: URL {
+        directoryURL.appendingPathComponent("data.typedb")
+    }
+
+    func create() throws {
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+    }
+
+    func cleanup() {
+        try? FileManager.default.removeItem(at: directoryURL)
     }
 }

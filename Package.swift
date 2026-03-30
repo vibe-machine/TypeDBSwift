@@ -13,6 +13,9 @@ let package = Package(
             targets: ["TypeDBSwift"]
         ),
     ],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-protobuf.git", from: "1.36.0")
+    ],
     targets: [
         // C library target providing the TypeDB driver C API
         .target(
@@ -31,7 +34,10 @@ let package = Package(
         // Swift wrapper library
         .target(
             name: "TypeDBSwift",
-            dependencies: ["CTypeDBDriver"],
+            dependencies: [
+                "CTypeDBDriver",
+                .product(name: "SwiftProtobuf", package: "swift-protobuf")
+            ],
             path: "Sources/TypeDBSwift"
         ),
 
