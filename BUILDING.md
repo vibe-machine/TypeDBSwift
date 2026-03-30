@@ -8,7 +8,7 @@ The fastest way to get started:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourorg/TypeDBSwift.git
+git clone https://github.com/objectiveous/TypeDBSwift.git
 cd TypeDBSwift
 
 # Fetch the pre-built C driver (recommended)

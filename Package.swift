@@ -21,14 +21,7 @@ let package = Package(
         .target(
             name: "CTypeDBDriver",
             path: "Sources/CTypeDBDriver",
-            publicHeadersPath: "include",
-            linkerSettings: [
-                .unsafeFlags(["-L", "Sources/CTypeDBDriver/lib"]),
-                .unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@loader_path"]),
-                .unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path"]),
-                // Add project-relative rpath for development
-                .unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "Sources/CTypeDBDriver/lib"]),
-            ]
+            publicHeadersPath: "include"
         ),
 
         // Swift wrapper library

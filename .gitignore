@@ -32,6 +32,10 @@ xcuserdata/
 *.profdata
 *.profraw
 
+# Local config (machine-specific)
+Local.xcconfig
+.envrc
+
 # Don't track the dylib - fetch it with scripts/fetch-driver.sh
 # Uncomment these lines if you want to require users to fetch the driver
 # Sources/CTypeDBDriver/lib/*.dylib

@@ -4,8 +4,28 @@ A Swift driver for [TypeDB](https://typedb.com/), wrapping the official C driver
 
 ## Status
 
-**Early Development** - Core connection and database management APIs are implemented.
-Transaction and query APIs are not yet implemented.
+Connection, database management, user management, query execution, and async/await are all implemented. Transaction and concept APIs are not yet implemented.
+
+## Installation
+
+Add TypeDBSwift to your `Package.swift`:
+
+```swift
+dependencies: [
+    .package(url: "https://github.com/objectiveous/TypeDBSwift.git", from: "0.1.0")
+]
+```
+
+Then add it to your target:
+
+```swift
+.target(
+    name: "YourApp",
+    dependencies: ["TypeDBSwift"]
+)
+```
+
+The C driver dylib must be available at runtime. See [Runtime Library Path](#runtime-library-path) for details.
 
 ## Requirements
 
@@ -17,7 +37,7 @@ Transaction and query APIs are not yet implemented.
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourorg/TypeDBSwift.git
+git clone https://github.com/objectiveous/TypeDBSwift.git
 cd TypeDBSwift
 
 # Fetch the pre-built C driver
@@ -178,6 +198,7 @@ See [BUILDING.md](BUILDING.md) for details on updating to newer versions.
 | `close()` | Close the connection |
 | `forceClose()` | Force close, aborting pending operations |
 | `databases` | Access the DatabaseManager |
+| `users` | Access the UserManager |
 
 ### DatabaseManager
 
@@ -195,15 +216,27 @@ See [BUILDING.md](BUILDING.md) for details on updating to newer versions.
 | `name` | The database name |
 | `delete()` | Delete this database |
 
+### UserManager
+
+| Method | Description |
+|--------|-------------|
+| `all()` | List all users |
+| `contains(_:)` | Check if a user exists |
+| `create(username:password:)` | Create a new user |
+| `get(_:)` | Get a User by name |
+| `delete(username:)` | Delete a user |
+| `setPassword(username:password:)` | Update a user's password |
+
 ## Roadmap
 
+- [x] Query execution
+- [x] Async/await support
+- [x] User management APIs
+- [x] Database export/import
 - [ ] Transaction support (`Transaction`, `TransactionType`)
-- [ ] Query execution (`transaction.query()`)
 - [ ] Concept types (Entity, Relation, Attribute)
 - [ ] Answer handling (ConceptRow, ConceptDocument)
-- [ ] Async/await support (wrap C promises)
 - [ ] AsyncSequence for iterators
-- [ ] User management APIs
 
 ## Related Documentation
 
