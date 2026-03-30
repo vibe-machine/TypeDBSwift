@@ -58,7 +58,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo "Tag $TAG pushed to origin."
     echo ""
     echo "Next steps:"
-    echo "  1. Go to https://github.com/objectiveous/TypeDBSwift/releases"
+    echo "  1. Go to https://github.com/vibe-machine/TypeDBSwift/releases"
     echo "  2. Create a release from tag $TAG"
     echo "  3. Add release notes from CHANGELOG.md"
 else
@@ -69,4 +69,4 @@ fi
 
 echo ""
 echo "Consumers can now add this package:"
-echo "  .package(url: \"https://github.com/objectiveous/TypeDBSwift.git\", from: \"$VERSION\")"
+echo "  .package(url: \"https://github.com/vibe-machine/TypeDBSwift.git\", from: \"$VERSION\")"

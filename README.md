@@ -12,7 +12,7 @@ Add TypeDBSwift to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/objectiveous/TypeDBSwift.git", from: "0.1.0")
+    .package(url: "https://github.com/vibe-machine/TypeDBSwift.git", from: "0.1.0")
 ]
 ```
 
@@ -37,7 +37,7 @@ The C driver dylib must be available at runtime. See [Runtime Library Path](#run
 
 ```bash
 # Clone the repository
-git clone https://github.com/objectiveous/TypeDBSwift.git
+git clone https://github.com/vibe-machine/TypeDBSwift.git
 cd TypeDBSwift
 
 # Fetch the pre-built C driver

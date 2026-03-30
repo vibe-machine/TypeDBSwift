@@ -5,7 +5,7 @@ Thanks for your interest in contributing to TypeDBSwift!
 ## Development Setup
 
 ```bash
-git clone https://github.com/objectiveous/TypeDBSwift.git
+git clone https://github.com/vibe-machine/TypeDBSwift.git
 cd TypeDBSwift
 ./scripts/fetch-driver.sh
 swift build
