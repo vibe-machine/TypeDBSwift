@@ -54,8 +54,14 @@ export LD_LIBRARY_PATH="$LIB_DIR"
 echo "=== TypeDBSwift Test Runner ==="
 echo ""
 
-# Build test command
-TEST_CMD="swift test"
+# Build test command.
+#
+# We pass the lib directory both as a link search path (-L, needed at link time
+# to resolve the C symbols) and as an rpath (so the test bundle can locate the
+# dylib at runtime). DYLD_LIBRARY_PATH alone is not sufficient: it does not
+# affect link time, and macOS strips DYLD_* from the SIP-protected
+# swiftpm-xctest-helper that loads the test bundle.
+TEST_CMD="swift test -Xlinker -L$LIB_DIR -Xlinker -rpath -Xlinker $LIB_DIR"
 
 if $COVERAGE; then
     TEST_CMD="$TEST_CMD --enable-code-coverage"

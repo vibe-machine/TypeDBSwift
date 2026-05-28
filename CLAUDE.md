@@ -4,10 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-TypeDBSwift is a Swift driver for TypeDB that wraps the official TypeDB C driver via Swift C interop. It's in early development — connection and database management work; transactions and queries are not yet implemented.
+TypeDBSwift is a Swift driver for TypeDB that wraps the official TypeDB C driver via Swift C interop. Connection, database/user management, query execution, transactions, typed concepts, answer handling, and async/await are all implemented.
 
-- **Swift 5.9+**, macOS 13.0+ (arm64/x86_64)
-- **TypeDB server 3.7.0+** required for integration tests (default: `localhost:1729`, credentials `admin`/`password`)
+- **Swift 5.9+**, macOS 15.5+ (the bundled TypeDB 3.11.5 C driver dylib requires a macOS 15.5+ runtime)
+- **TypeDB server 3.11.0+** required for integration tests (default: `localhost:1729`, credentials `admin`/`password`). The 3.11 wire protocol rejects older clients, and a 3.11 client cannot connect to a pre-3.11 server.
 
 ## Build & Test Commands
 
@@ -32,11 +32,14 @@ swift build
 # Run with coverage
 ./scripts/test.sh --coverage
 
-# Manual test invocation (must set library path)
-DYLD_LIBRARY_PATH="$PWD/Sources/CTypeDBDriver/lib" swift test
+# Manual test invocation. The -L resolves the C symbols at link time; the
+# -rpath lets the SIP-protected xctest helper (which strips DYLD_*) find the
+# dylib at runtime. DYLD_LIBRARY_PATH alone is NOT sufficient.
+LIB="$PWD/Sources/CTypeDBDriver/lib"
+swift test -Xlinker -L"$LIB" -Xlinker -rpath -Xlinker "$LIB"
 
 # Run a single test by name
-DYLD_LIBRARY_PATH="$PWD/Sources/CTypeDBDriver/lib" swift test --filter testMethodName
+swift test -Xlinker -L"$LIB" -Xlinker -rpath -Xlinker "$LIB" --filter testMethodName
 ```
 
 ## Architecture

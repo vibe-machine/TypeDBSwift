@@ -55,6 +55,17 @@ class TestContext {
         driver = nil
     }
 
+    /// Adopt an externally-created driver (e.g. from an async connect) so the
+    /// context closes it during cleanup.
+    func adopt(driver: TypeDBDriver) {
+        self.driver = driver
+    }
+
+    /// Track a database name for automatic cleanup.
+    func track(database name: String) {
+        createdDatabases.append(name)
+    }
+
     // MARK: - Database Helpers
 
     /// Generate a unique test database name with the given prefix.

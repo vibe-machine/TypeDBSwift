@@ -43,6 +43,15 @@ internal func dispatchBlockingVoid(_ operation: @escaping @Sendable () throws ->
     }
 }
 
+/// Fire-and-forget cleanup on the driver's serial queue.
+///
+/// Used to drop C resources (iterators, transactions) from `deinit`, which
+/// cannot `await`. Serializing through the same queue keeps these drops ordered
+/// against all other C calls.
+internal func dispatchCleanup(_ operation: @escaping @Sendable () -> Void) {
+    driverQueue.async(execute: operation)
+}
+
 // MARK: - TypeDBDriver + Async
 
 extension TypeDBDriver {

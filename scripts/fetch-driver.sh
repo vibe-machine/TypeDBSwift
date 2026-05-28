@@ -9,17 +9,17 @@
 #   ./scripts/fetch-driver.sh [version] [platform]
 #
 # Examples:
-#   ./scripts/fetch-driver.sh                    # Uses defaults (3.7.0, mac-arm64)
-#   ./scripts/fetch-driver.sh 3.7.0              # Specific version
-#   ./scripts/fetch-driver.sh 3.7.0 mac-arm64    # Specific version and platform
-#   ./scripts/fetch-driver.sh 3.7.0 mac-x86_64   # Intel Mac
-#   ./scripts/fetch-driver.sh 3.7.0 linux-arm64  # Linux ARM64
-#   ./scripts/fetch-driver.sh 3.7.0 linux-x86_64 # Linux x86_64
+#   ./scripts/fetch-driver.sh                     # Uses defaults (3.11.5, mac-arm64)
+#   ./scripts/fetch-driver.sh 3.11.5              # Specific version
+#   ./scripts/fetch-driver.sh 3.11.5 mac-arm64    # Specific version and platform
+#   ./scripts/fetch-driver.sh 3.11.5 mac-x86_64   # Intel Mac
+#   ./scripts/fetch-driver.sh 3.11.5 linux-arm64  # Linux ARM64
+#   ./scripts/fetch-driver.sh 3.11.5 linux-x86_64 # Linux x86_64
 
 set -euo pipefail
 
 # Configuration
-DEFAULT_VERSION="3.7.0"
+DEFAULT_VERSION="3.11.5"
 DEFAULT_PLATFORM="mac-arm64"
 
 VERSION="${1:-$DEFAULT_VERSION}"
