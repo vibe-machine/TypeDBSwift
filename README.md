@@ -69,6 +69,7 @@ TypeDBSwift/
 │   └── TypeDBSwift/              # Swift wrapper library
 ├── Tests/
 │   └── TypeDBSwiftTests/         # Unit and integration tests
+│       └── Behaviour/            # typedb-behaviour BDD conformance suite
 ├── scripts/
 │   ├── build.sh                  # Main build script
 │   ├── test.sh                   # Test runner with coverage
@@ -106,6 +107,44 @@ swift build
 LIB="$PWD/Sources/CTypeDBDriver/lib"
 swift test -Xlinker -L"$LIB" -Xlinker -rpath -Xlinker "$LIB"
 ```
+
+## Conformance Testing
+
+TypeDBSwift is verified against the **official [`typedb/typedb-behaviour`][behaviour]
+BDD specification** — the same cross-driver conformance suite the official
+Rust, Python, and Java drivers run. Rather than only testing our own
+assumptions, we drive the upstream Gherkin scenarios through the Swift wrapper,
+so its behavior is checked against the canonical TypeDB spec.
+
+The feature files are vendored under
+[`Tests/TypeDBSwiftTests/Behaviour/`](Tests/TypeDBSwiftTests/Behaviour/):
+
+- `features/connection/database.feature` — vendored **verbatim** from upstream.
+- `features/connection/transaction.feature` — vendored **verbatim** from upstream.
+- `features/query/basic.feature` — a curated define/insert/match/fetch subset,
+  written against the same step vocabulary.
+
+A small in-repo Gherkin harness (`Gherkin.swift` + `BehaviourSteps.swift`)
+parses these files and executes each step against the real driver and a running
+TypeDB server, enforcing the spec's `; fails` / `; parsing fails` expectations.
+Upstream ignore tags (`@ignore`, `@ignore-typedb-driver[-swift]`) are honored,
+while scenarios tagged only for other drivers still run.
+
+Current status: **all 63 vendored scenarios pass** against TypeDB 3.11. They run
+as part of `./scripts/test.sh` (and `--integration`); the runner deletes all
+databases when the connection opens to establish the spec's clean-slate
+precondition, so point it at a dedicated test server. See the
+[suite README](Tests/TypeDBSwiftTests/Behaviour/README.md) for details and
+refresh instructions.
+
+```bash
+# Run just the conformance suite
+LIB="$PWD/Sources/CTypeDBDriver/lib"
+swift test -Xlinker -L"$LIB" -Xlinker -rpath -Xlinker "$LIB" \
+    --filter BehaviourConformanceTests
+```
+
+[behaviour]: https://github.com/typedb/typedb-behaviour
 
 ## Usage
 
