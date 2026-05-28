@@ -91,7 +91,7 @@ public final class UserManager {
             throw TypeDBError(code: "DRIVER_CLOSED", message: "Driver connection is closed")
         }
 
-        guard let userPtr = users_get_current_user(driverPtr) else {
+        guard let userPtr = users_get_current(driverPtr) else {
             try TypeDBError.checkAndThrow()
             throw TypeDBError(code: "USER_NOT_FOUND", message: "Could not retrieve current user")
         }

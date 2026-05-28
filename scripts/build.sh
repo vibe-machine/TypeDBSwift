@@ -122,7 +122,9 @@ if $RUN_TESTS; then
     echo ""
     echo "=== Running Tests ==="
     export DYLD_LIBRARY_PATH="$LIB_DIR"
-    swift test
+    # -L for link-time symbol resolution; -rpath so the SIP-protected test
+    # helper (which strips DYLD_*) can locate the dylib at runtime.
+    swift test -Xlinker -L"$LIB_DIR" -Xlinker -rpath -Xlinker "$LIB_DIR"
 fi
 
 echo ""

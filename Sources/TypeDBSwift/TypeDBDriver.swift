@@ -73,11 +73,25 @@ public final class TypeDBDriver {
         credentials: TypeDBCredentials? = nil,
         options: TypeDBDriverOptions = TypeDBDriverOptions()
     ) throws -> TypeDBDriver {
-        // Create driver options (always required, non-null)
-        guard let optionsPtr = driver_options_new(
-            options.tlsEnabled,
-            options.tlsRootCA
-        ) else {
+        // Build the TLS configuration (TypeDB 3.11+ replaced the bool/root-CA
+        // arguments to driver_options_new with an explicit DriverTlsConfig).
+        let tlsConfig: OpaquePointer?
+        if options.tlsEnabled {
+            if let rootCA = options.tlsRootCA {
+                tlsConfig = driver_tls_config_new_enabled_with_root_ca_path(rootCA)
+            } else {
+                tlsConfig = driver_tls_config_new_enabled_with_native_root_ca()
+            }
+        } else {
+            tlsConfig = driver_tls_config_new_disabled()
+        }
+        guard let tlsConfigPtr = tlsConfig else {
+            throw TypeDBError(code: "TLS_CONFIG_FAILED", message: "Failed to create TLS configuration")
+        }
+
+        // Create driver options (always required, non-null). driver_options_new
+        // takes ownership of the TLS config pointer.
+        guard let optionsPtr = driver_options_new(tlsConfigPtr) else {
             throw TypeDBError(code: "OPTIONS_FAILED", message: "Failed to create driver options")
         }
         defer { driver_options_drop(optionsPtr) }
@@ -97,8 +111,9 @@ public final class TypeDBDriver {
             }
         }
 
-        // Open the connection
-        guard let driverPtr = driver_open(address, credentialsPtr, optionsPtr) else {
+        // Open the connection. TypeDB 3.11+ renamed driver_open to driver_new
+        // and added a driver_lang argument (NULL defaults to "c").
+        guard let driverPtr = driver_new(address, credentialsPtr, optionsPtr, nil) else {
             try TypeDBError.checkAndThrow()
             throw TypeDBError(code: "CONNECTION_FAILED", message: "Failed to connect to \(address)")
         }

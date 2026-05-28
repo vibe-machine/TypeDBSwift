@@ -7,7 +7,7 @@ public enum TypeDBQueryTransactionType: String, Sendable {
     case write
     case schema
 
-    var cValue: TransactionType {
+    var cValue: CTypeDBDriver.TransactionType {
         switch self {
         case .read:
             return Read
@@ -85,7 +85,11 @@ public extension TypeDBDriver {
         var transactionFinalized = false
         defer {
             if !transactionFinalized {
-                transaction_submit_close(transaction)
+                // TypeDB 3.11+ removed transaction_submit_close; transaction_close
+                // returns a promise that must be resolved to perform the close.
+                if let closePromise = transaction_close(transaction) {
+                    void_promise_resolve(closePromise)
+                }
             }
         }
 
@@ -236,7 +240,11 @@ public extension TypeDBDriver {
         var transactionFinalized = false
         defer {
             if !transactionFinalized {
-                transaction_submit_close(transaction)
+                // TypeDB 3.11+ removed transaction_submit_close; transaction_close
+                // returns a promise that must be resolved to perform the close.
+                if let closePromise = transaction_close(transaction) {
+                    void_promise_resolve(closePromise)
+                }
             }
         }
 

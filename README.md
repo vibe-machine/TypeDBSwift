@@ -4,7 +4,7 @@ A Swift driver for [TypeDB](https://typedb.com/), wrapping the official C driver
 
 ## Status
 
-Connection, database management, user management, query execution, and async/await are all implemented. Transaction and concept APIs are not yet implemented.
+Connection, database management, user management, query execution, transactions, typed concepts, answer handling, and async/await are all implemented.
 
 ## Installation
 
@@ -12,7 +12,7 @@ Add TypeDBSwift to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/vibe-machine/TypeDBSwift.git", from: "0.1.0")
+    .package(url: "https://github.com/vibe-machine/TypeDBSwift.git", from: "0.2.0")
 ]
 ```
 
@@ -29,9 +29,11 @@ The C driver dylib must be available at runtime. See [Runtime Library Path](#run
 
 ## Requirements
 
-- macOS 13.0+ (arm64 or x86_64)
+- macOS 13.0+ to build; the bundled TypeDB 3.11.5 C driver dylib requires a
+  macOS 15.5+ runtime
 - Swift 5.9+
-- TypeDB server 3.7.0+
+- TypeDB server 3.11.0+ (the 3.11 wire protocol rejects older clients, and a
+  3.11 client cannot connect to a pre-3.11 server)
 
 ## Quick Start
 
@@ -99,8 +101,10 @@ swift build
 ./scripts/test.sh --unit       # Unit tests only (no server)
 ./scripts/test.sh --coverage   # With code coverage
 
-# Or manually
-DYLD_LIBRARY_PATH="$PWD/Sources/CTypeDBDriver/lib" swift test
+# Or manually (-L resolves C symbols at link time; -rpath lets the
+# SIP-protected test helper locate the dylib at runtime)
+LIB="$PWD/Sources/CTypeDBDriver/lib"
+swift test -Xlinker -L"$LIB" -Xlinker -rpath -Xlinker "$LIB"
 ```
 
 ## Usage
@@ -146,6 +150,47 @@ let driver = try TypeDBDriver.connect(
     options: options
 )
 ```
+
+### Transactions, Concepts, and Streaming Answers
+
+Open a `Transaction` and run one or more queries. Concept-row answers stream
+lazily as an `AsyncSequence`, and each `Concept` exposes typed values.
+
+```swift
+// Schema
+let schemaTx = try await driver.transaction(.schema, database: "social")
+_ = try await schemaTx.query("""
+    define
+      attribute name, value string;
+      attribute age, value integer;
+      entity person, owns name, owns age;
+    """)
+try await schemaTx.commit()
+
+// Write
+let writeTx = try await driver.transaction(.write, database: "social")
+_ = try await writeTx.query(#"insert $p isa person, has name "Alice", has age 30;"#)
+try await writeTx.commit()        // or: try await writeTx.rollback()
+
+// Read — stream typed concept rows
+let readTx = try await driver.transaction(.read, database: "social")
+let answer = try await readTx.query(
+    "match $p isa person, has name $n, has age $a; select $n, $a;"
+)
+
+if case let .conceptRows(rows) = answer {
+    for try await row in rows {
+        if case let .string(name)? = row["n"]?.value,
+           case let .integer(age)? = row["a"]?.value {
+            print("\(name) is \(age)")
+        }
+    }
+}
+```
+
+`fetch` queries return `.conceptDocuments`, an `AsyncSequence` of
+`ConceptDocument` whose `json` property holds the rendered document. Both
+streams also offer `collect()` to materialize all elements into an array.
 
 ## Xcode Integration
 
@@ -216,6 +261,22 @@ See [BUILDING.md](BUILDING.md) for details on updating to newer versions.
 | `name` | The database name |
 | `delete()` | Delete this database |
 
+### Transaction
+
+| Property/Method | Description |
+|-----------------|-------------|
+| `driver.transaction(_:database:)` | Open a `Transaction` (`.read` / `.write` / `.schema`) |
+| `query(_:)` | Run a query, returning a `QueryAnswer` |
+| `commit()` | Commit the transaction (write/schema) |
+| `rollback()` | Discard uncommitted changes |
+| `close()` | Close without committing (idempotent) |
+| `isOpen` | Whether the transaction is still open |
+
+`QueryAnswer` is `.ok`, `.conceptRows(ConceptRowStream)`, or
+`.conceptDocuments(ConceptDocumentStream)`. A `ConceptRow` maps column names to
+`Concept` values; `Concept` exposes `.label`, `.iid`, and `.value` (a typed
+`TypeDBValue`).
+
 ### UserManager
 
 | Method | Description |
@@ -233,10 +294,10 @@ See [BUILDING.md](BUILDING.md) for details on updating to newer versions.
 - [x] Async/await support
 - [x] User management APIs
 - [x] Database export/import
-- [ ] Transaction support (`Transaction`, `TransactionType`)
-- [ ] Concept types (Entity, Relation, Attribute)
-- [ ] Answer handling (ConceptRow, ConceptDocument)
-- [ ] AsyncSequence for iterators
+- [x] Transaction support (`Transaction`, `TransactionType`)
+- [x] Concept types (`Concept`: entity/relation/attribute types & instances, values)
+- [x] Answer handling (`ConceptRow`, `ConceptDocument`, typed `TypeDBValue`)
+- [x] AsyncSequence for iterators (`ConceptRowStream`, `ConceptDocumentStream`)
 
 ## Related Documentation
 

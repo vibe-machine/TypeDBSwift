@@ -25,35 +25,47 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-/**
- * A representation of the comparator used in a comparison constraint.
- */
-typedef enum Comparator {
-  Equal,
-  NotEqual,
-  LessThan,
-  LessOrEqual,
-  Greater,
-  GreaterOrEqual,
-  Like,
-  Contains,
-} Comparator;
+typedef enum FetchVariant {
+  LeafDocument,
+  ListDocument,
+  ObjectDocument,
+} FetchVariant;
+
+typedef enum ReturnOperationVariant {
+  StreamReturn,
+  SingleReturn,
+  CheckReturn,
+  ReduceReturn,
+} ReturnOperationVariant;
+
+typedef enum PipelineStageVariant {
+  Match,
+  Insert,
+  Put,
+  Update,
+  Delete,
+  Select,
+  Sort,
+  Require,
+  Offset,
+  Limit,
+  Distinct,
+  Reduce,
+} PipelineStageVariant;
 
 /**
- * Tells apart exact variants of constraints from the ones allowing subtype-polymorphism.
- * e.g. <code>isa!</code> would be represented as an <code>Constraint::Isa</code>
- * with its exactness field <code>ConstraintExactness::Exact</code>.
+ * The order of a variable being sorted on in a <code>PipelineStage::Sort</code>
  */
-typedef enum ConstraintExactness {
-  /**
-   * Indicates the constraint matches exactly the specified type - e.g. `isa!` or `sub!`
-   */
-  Exact,
-  /**
-   * Indicates the constraint matches the specified type and its subtypes - e.g. `isa!` or `sub!`
-   */
-  Subtypes,
-} ConstraintExactness;
+typedef enum SortOrder {
+  Ascending,
+  Descending,
+} SortOrder;
+
+typedef enum VariableAnnotationsVariant {
+  InstanceAnnotations,
+  TypeAnnotations,
+  ValueAnnotations,
+} VariableAnnotationsVariant;
 
 typedef enum ConstraintVariant {
   Isa,
@@ -76,44 +88,65 @@ typedef enum ConstraintVariant {
   Try,
 } ConstraintVariant;
 
-typedef enum ConstraintVertexVariant {
-  VariableVertex,
-  LabelVertex,
-  ValueVertex,
-  NamedRoleVertex,
-} ConstraintVertexVariant;
+/**
+ * Tells apart exact variants of constraints from the ones allowing subtype-polymorphism.
+ * e.g. <code>isa!</code> would be represented as an <code>Constraint::Isa</code>
+ * with its exactness field <code>ConstraintExactness::Exact</code>.
+ */
+typedef enum ConstraintExactness {
+  /**
+   * Indicates the constraint matches exactly the specified type - e.g. `isa!` or `sub!`
+   */
+  Exact,
+  /**
+   * Indicates the constraint matches the specified type and its subtypes - e.g. `isa!` or `sub!`
+   */
+  Subtypes,
+} ConstraintExactness;
 
-typedef enum FetchVariant {
-  LeafDocument,
-  ListDocument,
-  ObjectDocument,
-} FetchVariant;
+/**
+ * A representation of the comparator used in a comparison constraint.
+ */
+typedef enum Comparator {
+  Equal,
+  NotEqual,
+  LessThan,
+  LessOrEqual,
+  Greater,
+  GreaterOrEqual,
+  Like,
+  Contains,
+} Comparator;
 
 /**
  * Kind represents the base of a defined type to describe its capabilities.
  * For example, "define entity person;" defines a type "person" of a kind "entity".
  */
 typedef enum Kind {
+  /**
+   * Entity type kind.
+   */
   Entity,
+  /**
+   * Attribute type kind.
+   */
   Attribute,
+  /**
+   * Relation type kind.
+   */
   Relation,
+  /**
+   * Role type kind (a role played in a relation).
+   */
   Role,
 } Kind;
 
-typedef enum PipelineStageVariant {
-  Match,
-  Insert,
-  Put,
-  Update,
-  Delete,
-  Select,
-  Sort,
-  Require,
-  Offset,
-  Limit,
-  Distinct,
-  Reduce,
-} PipelineStageVariant;
+typedef enum ConstraintVertexVariant {
+  VariableVertex,
+  LabelVertex,
+  ValueVertex,
+  NamedRoleVertex,
+} ConstraintVertexVariant;
 
 /**
  * This enum is used to specify the type of the query resulted in this answer.
@@ -125,25 +158,53 @@ typedef enum PipelineStageVariant {
  * ```
  */
 typedef enum QueryType {
+  /**
+   * A read-only query (e.g. <code>match</code>).
+   */
   ReadQuery,
+  /**
+   * A data-modifying query (e.g. <code>insert</code>, <code>delete</code>, <code>update</code>).
+   */
   WriteQuery,
+  /**
+   * A schema-modifying query (e.g. <code>define</code>, <code>undefine</code>, <code>redefine</code>).
+   */
   SchemaQuery,
 } QueryType;
 
-typedef enum ReturnOperationVariant {
-  StreamReturn,
-  SingleReturn,
-  CheckReturn,
-  ReduceReturn,
-} ReturnOperationVariant;
+/**
+ * <code>ServerRoutingType</code> is used to represent server routing directives in FFI.
+ * It is the tag part, which is combined with optional fields to form an instance of the original
+ * enum.
+ */
+typedef enum ServerRoutingType {
+  /**
+   * Routing decisions are made automatically by the driver.
+   */
+  Auto,
+  /**
+   * The driver is pinned to a specific server address.
+   */
+  Direct,
+} ServerRoutingType;
 
 /**
- * The order of a variable being sorted on in a <code>PipelineStage::Sort</code>
+ * This enum is used to specify the replication role of a server.
  */
-typedef enum SortOrder {
-  Ascending,
-  Descending,
-} SortOrder;
+typedef enum ReplicationRole {
+  /**
+   * The primary (leader) server in a replicated cluster.
+   */
+  Primary,
+  /**
+   * A candidate server eligible for promotion to primary.
+   */
+  Candidate,
+  /**
+   * A secondary (follower) server.
+   */
+  Secondary,
+} ReplicationRole;
 
 /**
  * This enum is used to specify the type of transaction.
@@ -155,16 +216,19 @@ typedef enum SortOrder {
  * ```
  */
 typedef enum TransactionType {
+  /**
+   * Read-only transaction.
+   */
   Read = 0,
+  /**
+   * Data-modifying transaction.
+   */
   Write = 1,
+  /**
+   * Schema-modifying transaction.
+   */
   Schema = 2,
 } TransactionType;
-
-typedef enum VariableAnnotationsVariant {
-  InstanceAnnotations,
-  TypeAnnotations,
-  ValueAnnotations,
-} VariableAnnotationsVariant;
 
 /**
  * An <code>AnalyzedQuery</code> contains the server's representation of the query and preamble functions;
@@ -189,12 +253,6 @@ typedef struct Concept Concept;
  * Iterator over the <code>Concepts</code>s returned by an API method or query.
  */
 typedef struct ConceptIterator ConceptIterator;
-
-/**
- * Promise object representing the result of an asynchronous operation.
- * Use \ref concept_promise_resolve(ConceptPromise*) to wait for and retrieve the resulting boolean value.
- */
-typedef struct ConceptPromise ConceptPromise;
 
 /**
  * A single row of concepts representing substitutions for variables in the query.
@@ -229,6 +287,7 @@ typedef struct ConjunctionIDIterator ConjunctionIDIterator;
  * * A <code>Label</code> uniquely identifies a type
  * * A <code>Value</code> represents a primitive value literal in TypeDB.
  * * A <code>NamedRole</code> vertex is used in links & relates constraints, as multiple relations may have roles with the same name.
+ *
  * The types inferred for <code>Variable</code>, <code>Label</code> and <code>NamedRole</code> vertices
  * can be read from the <code>variable_annotations</code> field of the <code>Conjunction</code> it is in.
  */
@@ -246,7 +305,7 @@ typedef struct ConstraintWithSpanIterator ConstraintWithSpanIterator;
 typedef struct Credentials Credentials;
 
 /**
- * A TypeDB database
+ * A TypeDB database.
  */
 typedef struct Database Database;
 
@@ -256,9 +315,30 @@ typedef struct Database Database;
 typedef struct DatabaseIterator DatabaseIterator;
 
 /**
- * User connection settings for connecting to TypeDB.
+ * TypeDB driver connection options.
+ * `DriverOptions` object can be used to override the default driver behavior while connecting to
+ * TypeDB.
+ *
+ * # Examples
+ *
+ * ```rust
+ * let options = DriverOptions::new(DriverTlsConfig::default()).request_timeout(Duration::from_secs(30));
+ * ```
  */
 typedef struct DriverOptions DriverOptions;
+
+/**
+ * TLS configuration for the TypeDB driver.
+ *
+ * `DriverTlsConfig` represents a fully constructed and validated TLS configuration.
+ * If TLS is enabled, the underlying TLS config is built eagerly at construction time,
+ * ensuring that no connection attempt can observe a partially-configured TLS state.
+ *
+ * The driver defaults to using TLS with **native system trust roots**.
+ * This matches typical system and container deployments while still allowing
+ * explicit opt-out or custom PKI configuration.
+ */
+typedef struct DriverTlsConfig DriverTlsConfig;
 
 /**
  * Represents errors encountered during operation.
@@ -336,6 +416,16 @@ typedef struct ReducerIterator ReducerIterator;
 typedef struct ReturnOperation ReturnOperation;
 
 /**
+ * The metadata and state of an individual server of a driver connection.
+ */
+typedef struct Server Server;
+
+/**
+ * Iterator over the <code>Server</code> corresponding to each server of a TypeDB cluster.
+ */
+typedef struct ServerIterator ServerIterator;
+
+/**
  * The variable being sorted on and the ordering of the sort, as used in a <code>PipelineStage::Sort</code>,
  *  e.g. <code>sort $v desc</code>
  */
@@ -366,7 +456,7 @@ typedef struct Transaction Transaction;
 
 /**
  * TypeDB transaction options.
- * `TransactionOptions` object can be used to override the default server behaviour for opened
+ * `TransactionOptions` object can be used to override the default behaviour for opened
  * transactions.
  *
  * # Examples
@@ -382,10 +472,13 @@ typedef struct TransactionOptions TransactionOptions;
  */
 typedef struct TypeDBDriver TypeDBDriver;
 
+/**
+ * A TypeDB server user, identified by a username.
+ */
 typedef struct User User;
 
 /**
- * Iterator over a set of <code>User</code>s
+ * Iterator over a set of <code>User</code>s.
  */
 typedef struct UserIterator UserIterator;
 
@@ -413,19 +506,37 @@ typedef struct VoidPromise VoidPromise;
  * a number of nanoseconds since the last seconds boundary.
  */
 typedef struct DatetimeInNanos {
+  /**
+   * Whole seconds since the Unix epoch.
+   */
   int64_t seconds;
+  /**
+   * Nanoseconds elapsed since the last whole-second boundary.
+   */
   uint32_t subsec_nanos;
 } DatetimeInNanos;
 
 /**
- * A <code>DatetimeAndTimeZone</code> used to represent time zoned datetime in FFI.
+ * <code>DatetimeAndTimeZone</code> is used to represent time zoned datetime in FFI.
  * Time zone can be represented either as an IANA <code>Tz</code> or as a <code>FixedOffset</code>.
  * Either the zone_name (is_fixed_offset == false) or offset (is_fixed_offset == true) is set.
  */
 typedef struct DatetimeAndTimeZone {
+  /**
+   * The datetime expressed as a (seconds, subsec_nanos) pair.
+   */
   struct DatetimeInNanos datetime_in_nanos;
+  /**
+   * IANA time zone identifier (e.g. <code>"Europe/London"</code>); set when <code>is_fixed_offset</code> is false.
+   */
   char *zone_name;
+  /**
+   * Offset from UTC in seconds; set when <code>is_fixed_offset</code> is true.
+   */
   int32_t local_minus_utc_offset;
+  /**
+   * True if the time zone is a fixed offset, false if it is an IANA-named zone.
+   */
   bool is_fixed_offset;
 } DatetimeAndTimeZone;
 
@@ -434,7 +545,13 @@ typedef struct DatetimeAndTimeZone {
  * <code>_0</code> and <code>_1</code> are the owner and attribute variables respectively.
  */
 typedef struct StringAndOptValue {
+  /**
+   * The string component of the pair (e.g. a struct field name).
+   */
   char *string;
+  /**
+   * Optional <code>Concept</code> value associated with the string; may be null.
+   */
   struct Concept *value;
 } StringAndOptValue;
 
@@ -443,7 +560,14 @@ typedef struct StringAndOptValue {
  * Holds exactly 19 digits after the decimal point and a 64-bit value before the decimal point.
  */
 typedef struct Decimal {
+  /**
+   * The integer part of the decimal as normal signed 64 bit number
+   */
   int64_t integer;
+  /**
+   * The fractional part of the decimal, in multiples of 10^-19 (Decimal::FRACTIONAL_PART_DENOMINATOR).
+   * This means that the smallest decimal representable is 10^-19, and up to 19 decimal places are supported.
+   */
   uint64_t fractional;
 } Decimal;
 
@@ -453,10 +577,81 @@ typedef struct Decimal {
  * When used as an absolute duration, convertible to chrono::Duration
  */
 typedef struct Duration {
+  /**
+   * Number of calendar months in the duration.
+   */
   uint32_t months;
+  /**
+   * Number of calendar days in the duration.
+   */
   uint32_t days;
+  /**
+   * Number of nanoseconds in the duration.
+   */
   uint64_t nanos;
 } Duration;
+/**
+ * Number of nanoseconds in one second.
+ */
+#define Duration_NANOS_PER_SEC 1000000000
+/**
+ * Number of days in one week.
+ */
+#define Duration_DAYS_PER_WEEK 7
+/**
+ * Number of months in one year.
+ */
+#define Duration_MONTHS_PER_YEAR 12
+
+/**
+ * <code>ServerVersion</code> is an FFI representation of a full server's version specification.
+ */
+typedef struct ServerVersion {
+  /**
+   * Distribution name (e.g. <code>"typedb"</code>, <code>"typedb-cluster"</code>).
+   */
+  char *distribution;
+  /**
+   * Distribution version string (e.g. <code>"3.7.0"</code>).
+   */
+  char *version;
+} ServerVersion;
+
+/**
+ * <code>ServerRouting</code> is used to represent server routing directives in FFI.
+ * It combines <code>ServerRoutingType</code> and optional fields to form an instance of the
+ * original enum.
+ * <code>address</code> is not null only when tag is <code>Direct</code>.
+ */
+typedef struct ServerRouting {
+  /**
+   * The routing variant.
+   */
+  enum ServerRoutingType type_;
+  /**
+   * Target server address; non-null only when <code>type_</code> is <code>Direct</code>.
+   */
+  char *address;
+} ServerRouting;
+
+/**
+ * Enables logging in the TypeDB driver.
+ *
+ * This function sets up tracing with two environment variables:
+ *
+ * - `TYPEDB_DRIVER_LOG`: Fine-grained control using the same syntax as `RUST_LOG`.
+ *   Example: `TYPEDB_DRIVER_LOG=typedb_driver=debug,typedb_driver_clib=trace`
+ *
+ * - `TYPEDB_DRIVER_LOG_LEVEL`: Simple log level that applies to both `typedb_driver`
+ *   and `typedb_driver_clib` crates. Overrides any settings from `TYPEDB_DRIVER_LOG`.
+ *   Example: `TYPEDB_DRIVER_LOG_LEVEL=debug`
+ *
+ * If neither is set, the default level is INFO for driver crates.
+ *
+ * The logging is initialized only once to prevent multiple initializations
+ * in applications that create multiple drivers.
+ */
+void init_logging(void);
 
 /**
  * Waits for and returns the result of the Analyze request.
@@ -1331,7 +1526,7 @@ struct QueryAnswer *query_answer_promise_resolve(struct QueryAnswerPromise *prom
 void query_answer_promise_drop(struct QueryAnswerPromise *promise);
 
 /**
- * Retrieve the executed query's type of the <code>QueryAnswer</code>.
+ * Retrieves the executed query's type of the <code>QueryAnswer</code>.
  */
 enum QueryType query_answer_get_query_type(const struct QueryAnswer *query_answer);
 
@@ -1376,13 +1571,13 @@ void concept_row_drop(struct ConceptRow *concept_row);
 struct StringIterator *concept_row_get_column_names(const struct ConceptRow *concept_row);
 
 /**
- * Retrieve the executed query's structure from the <code>ConceptRow</code>'s header, if set.
+ * Retrieves the executed query's structure from the <code>ConceptRow</code>'s header, if set.
  * It must be requested via "include query structure" in <code>QueryOptions</code>
  */
 struct Pipeline *concept_row_get_query_structure(const struct ConceptRow *concept_row);
 
 /**
- * Retrieve the executed query's type of the <code>ConceptRow</code>'s header.
+ * Retrieves the executed query's type of the <code>ConceptRow</code>'s header.
  */
 enum QueryType concept_row_get_query_type(const struct ConceptRow *concept_row);
 
@@ -1393,13 +1588,11 @@ struct ConceptIterator *concept_row_get_concepts(const struct ConceptRow *concep
 
 /**
  * Retrieves a concept for a given column name.
- *
  */
 struct Concept *concept_row_get(const struct ConceptRow *concept_row, const char *column_name);
 
 /**
  * Retrieves a concept for a given column index.
- *
  */
 struct Concept *concept_row_get_index(const struct ConceptRow *concept_row, uintptr_t column_index);
 
@@ -1431,16 +1624,72 @@ char *string_iterator_next(struct StringIterator *it);
 void string_iterator_drop(struct StringIterator *it);
 
 /**
- * Waits for and returns the result of the operation represented by the <code>ConceptPromise</code> object.
+ * Checks if the error flag was set by the last operation.
+ * If true, the error can be retrieved using \ref get_last_error(void)
+ */
+bool check_error(void);
+
+/**
+ * Returns the error which set the error flag.
+ */
+struct Error *get_last_error(void);
+
+/**
+ * Frees the native rust <code>Error</code> object
+ */
+void error_drop(struct Error *error);
+
+/**
+ * Returns the error code of the <code>Error</code> object
+ */
+char *error_code(const struct Error *error);
+
+/**
+ * Returns the error message of the <code>Error</code> object
+ */
+char *error_message(const struct Error *error);
+
+/**
+ * Frees a native rust string.
+ * _WARNING: Always use this function to free strings returned by the driver. Using the standard C free function will create a dangling reference on the rust side._
+ */
+void string_free(char *str);
+
+/**
+ * Waits for the operation represented by the <code>VoidPromise</code> to complete.
  * In case the operation failed, the error flag will only be set when the promise is resolved.
  * The native promise object is freed when it is resolved.
  */
-struct Concept *concept_promise_resolve(struct ConceptPromise *promise);
+void void_promise_resolve(struct VoidPromise *promise);
 
 /**
- * Frees the native rust <code>ConceptPromise</code> object.
+ * Frees the native rust <code>VoidPromise</code> object.
  */
-void concept_promise_drop(struct ConceptPromise *promise);
+void void_promise_drop(struct VoidPromise *promise);
+
+/**
+ * Waits for and returns the result of the operation represented by the <code>BoolPromise</code> object.
+ * In case the operation failed, the error flag will only be set when the promise is resolved.
+ * The native promise object is freed when it is resolved.
+ */
+bool bool_promise_resolve(struct BoolPromise *promise);
+
+/**
+ * Frees the native rust <code>BoolPromise</code> object.
+ */
+void bool_promise_drop(struct BoolPromise *promise);
+
+/**
+ * Waits for and returns the result of the operation represented by the <code>BoolPromise</code> object.
+ * In case the operation failed, the error flag will only be set when the promise is resolved.
+ * The native promise object is freed when it is resolved.
+ */
+char *string_promise_resolve(struct StringPromise *promise);
+
+/**
+ * Frees the native rust <code>StringPromise</code> object.
+ */
+void string_promise_drop(struct StringPromise *promise);
 
 /**
  * Forwards the <code>ConceptRowIterator</code> and returns the next <code>ConceptRow</code> if it exists,
@@ -1631,7 +1880,7 @@ struct DatetimeInNanos concept_get_datetime(const struct Concept *concept);
  * Returns the value of this datetime-tz value concept as seconds and nanoseconds parts since the start of the UNIX epoch and timezone information.
  * If the value has another type, the error is set.
  */
-struct DatetimeAndTimeZone concept_get_datetime_tz(const struct Concept *concept);
+struct DatetimeAndTimeZone *concept_get_datetime_tz(const struct Concept *concept);
 
 /**
  * Returns the value of this duration value.
@@ -1716,76 +1965,46 @@ struct Concept *relation_get_type(const struct Concept *relation);
 struct Concept *attribute_get_type(const struct Concept *attribute);
 
 /**
- * Open a TypeDB C Driver to a TypeDB server available at the provided address.
+ * Creates a new <code>Credentials</code> for connecting to TypeDB Server.
  *
- * @param address The address (host:port) on which the TypeDB Server is running
- * @param credentials The <code>Credentials</code> to connect with
- * @param driver_options The <code>DriverOptions</code> to connect with
+ * @param username The name of the user to connect as
+ * @param password The password for the user
  */
-struct TypeDBDriver *driver_open(const char *address,
-                                 const struct Credentials *credentials,
-                                 const struct DriverOptions *driver_options);
-
-/**
- * Open a TypeDB Driver to a TypeDB server available at the provided address.
- * This method allows driver language specification for drivers built on top of the native C layer.
- *
- * @param address The address (host:port) on which the TypeDB Server is running
- * @param credentials The <code>Credentials</code> to connect with
- * @param driver_options The <code>DriverOptions</code> to connect with
- * @param driver_lang The language of the driver connecting to the server
- */
-struct TypeDBDriver *driver_open_with_description(const char *address,
-                                                  const struct Credentials *credentials,
-                                                  const struct DriverOptions *driver_options,
-                                                  const char *driver_lang);
-
-/**
- * Closes the driver. Before instantiating a new driver, the driver that’s currently open should first be closed.
- * Closing a driver frees the underlying Rust object.
- */
-void driver_close(struct TypeDBDriver *driver);
-
-/**
- * Checks whether this connection is presently open.
- */
-bool driver_is_open(const struct TypeDBDriver *driver);
-
-/**
- * Forcibly closes the driver. To be used in exceptional cases.
- */
-void driver_force_close(struct TypeDBDriver *driver);
-
 struct Credentials *credentials_new(const char *username, const char *password);
 
+/**
+ * Frees the native rust <code>Credentials</code> object
+ */
 void credentials_drop(struct Credentials *credentials);
 
-struct DriverOptions *driver_options_new(bool is_tls_enabled, const char *tls_root_ca);
-
-void driver_options_drop(struct DriverOptions *driver_options);
-
 /**
- * Frees the native rust <code>Database</code> object
+ * Frees the native rust <code>Database</code> object.
  */
 void database_close(const struct Database *database);
 
 /**
- * The database name as a string.
+ * The <code>Database</code> name as a string.
  */
 char *database_get_name(const struct Database *database);
 
 /**
  * Deletes this database.
+ *
+ * @param database The <code>Database</code> to delete.
  */
 void database_delete(const struct Database *database);
 
 /**
  * A full schema text as a valid TypeQL define query string.
+ *
+ * @param database The <code>Database</code> to get the schema from.
  */
 char *database_schema(const struct Database *database);
 
 /**
  * The types in the schema as a valid TypeQL define query string.
+ *
+ * @param database The <code>Database</code> to get the type schema from.
  */
 char *database_type_schema(const struct Database *database);
 
@@ -1814,16 +2033,37 @@ void database_iterator_drop(struct DatabaseIterator *it);
 
 /**
  * Returns a <code>DatabaseIterator</code> over all databases present on the TypeDB server.
+ *
+ * @param driver The <code>TypeDBDriver</code> object.
  */
 struct DatabaseIterator *databases_all(struct TypeDBDriver *driver);
 
 /**
- * Create a database with the given name.
+ * Checks if a database with the given name exists.
+ *
+ * @param driver The <code>TypeDBDriver</code> object.
+ * @param name The name of the database.
+ */
+bool databases_contains(struct TypeDBDriver *driver, const char *name);
+
+/**
+ * Retrieves the database with the given name.
+ *
+ * @param driver The <code>TypeDBDriver</code> object.
+ * @param name The name of the database.
+ */
+const struct Database *databases_get(struct TypeDBDriver *driver, const char *name);
+
+/**
+ * Creates a database with the given name.
+ *
+ * @param driver The <code>TypeDBDriver</code> object.
+ * @param name The name of the database to be created.
  */
 void databases_create(struct TypeDBDriver *driver, const char *name);
 
 /**
- * Create a database with the given name based on previously exported another database's data
+ * Creates a database with the given name based on previously exported another database's data
  * loaded from a file.
  * This is a blocking operation and may take a significant amount of time depending on the database
  * size.
@@ -1839,87 +2079,194 @@ void databases_import_from_file(struct TypeDBDriver *driver,
                                 const char *data_file);
 
 /**
- * Checks if a database with the given name exists.
+ * Open a TypeDB Driver to a TypeDB server available at the provided address.
+ *
+ * @param address The address on which the TypeDB Server is running
+ * @param credentials The <code>Credentials</code> to connect with
+ * @param driver_options The <code>DriverOptions</code> to connect with
+ * @param driver_lang The language of the driver connecting to the server.
+ *        Nullable: pass NULL to default to "c".
  */
-bool databases_contains(struct TypeDBDriver *driver, const char *name);
+struct TypeDBDriver *driver_new(const char *address,
+                                const struct Credentials *credentials,
+                                const struct DriverOptions *driver_options,
+                                const char *driver_lang);
 
 /**
- * Retrieve the database with the given name.
+ * Open a TypeDB Driver to a TypeDB cluster available at the provided addresses.
+ *
+ * @param addresses A null-terminated array holding the server addresses on for connection
+ * @param credentials The <code>Credentials</code> to connect with
+ * @param driver_options The <code>DriverOptions</code> to connect with
+ * @param driver_lang The language of the driver connecting to the server.
+ *        Nullable: pass NULL to default to "c".
  */
-const struct Database *databases_get(struct TypeDBDriver *driver, const char *name);
+struct TypeDBDriver *driver_new_with_addresses(const char *const *addresses,
+                                               const struct Credentials *credentials,
+                                               const struct DriverOptions *driver_options,
+                                               const char *driver_lang);
 
 /**
- * Enables logging in the TypeDB driver.
+ * Open a TypeDB Driver to a TypeDB cluster, using the provided address translation.
+ *
+ * @param public_addresses A null-terminated array holding the replica addresses on for connection.
+ * @param private_addresses A null-terminated array holding the private replica addresses, configured on the server side.
+ * This array <i>must</i> have the same length as <code>public_addresses</code>.
+ * @param credentials The <code>Credentials</code> to connect with
+ * @param driver_options The <code>DriverOptions</code> to connect with
+ * @param driver_lang The language of the driver connecting to the server.
+ *        Nullable: pass NULL to default to "c".
  */
-void init_logging(void);
+struct TypeDBDriver *driver_new_with_address_translation(const char *const *public_addresses,
+                                                         const char *const *private_addresses,
+                                                         const struct Credentials *credentials,
+                                                         const struct DriverOptions *driver_options,
+                                                         const char *driver_lang);
 
 /**
- * Checks if the error flag was set by the last operation.
- * If true, the error can be retrieved using \ref get_last_error(void)
+ * Closes the <code>TypeDBDriver</code>. Before instantiating a new driver, the driver that’s currently open should first be closed.
+ * Closing a driver frees the underlying Rust object.
+ *
+ * @param driver The <code>TypeDBDriver</code> object.
  */
-bool check_error(void);
+void driver_close(struct TypeDBDriver *driver);
 
 /**
- * Returns the error which set the error flag.
+ * Forcibly closes the <code>TypeDBDriver</code>. To be used in exceptional cases.
+ *
+ * @param driver The <code>TypeDBDriver</code> object.
  */
-struct Error *get_last_error(void);
+void driver_force_close(struct TypeDBDriver *driver);
 
 /**
- * Frees the native rust <code>Error</code> object
+ * Checks whether this connection is presently open.
+ *
+ * @param driver The <code>TypeDBDriver</code> object.
  */
-void error_drop(struct Error *error);
+bool driver_is_open(const struct TypeDBDriver *driver);
 
 /**
- * Returns the error code of the <code>Error</code> object
+ * Retrieves the server version and distribution information.
+ *
+ * @param driver The <code>TypeDBDriver</code> object.
+ * @param server_routing The server routing directive to use for the operation. Auto if null.
  */
-char *error_code(const struct Error *error);
+struct ServerVersion *driver_server_version(const struct TypeDBDriver *driver,
+                                            const struct ServerRouting *server_routing);
 
 /**
- * Returns the error message of the <code>Error</code> object
+ * Retrieves the servers.
+ *
+ * @param driver The <code>TypeDBDriver</code> object.
+ * @param server_routing The server routing directive to use for the operation. Auto if null.
  */
-char *error_message(const struct Error *error);
+struct ServerIterator *driver_servers(const struct TypeDBDriver *driver,
+                                      const struct ServerRouting *server_routing);
 
 /**
- * Frees a native rust string.
- * _WARNING: Always use this function to free strings returned by the driver. Using the standard C free function will create a dangling reference on the rust side._
+ * Retrieves the server's primary server, if exists.
+ *
+ * @param driver The <code>TypeDBDriver</code> object.
+ * @param server_routing The server routing directive to use for the operation. Auto if null.
  */
-void string_free(char *str);
+struct Server *driver_primary_server(const struct TypeDBDriver *driver,
+                                     const struct ServerRouting *server_routing);
 
 /**
- * Waits for the operation represented by the <code>VoidPromise</code> to complete.
- * In case the operation failed, the error flag will only be set when the promise is resolved.
- * The native promise object is freed when it is resolved.
+ * Creates a new <code>DriverOptions</code> for connecting to TypeDB Server using custom TLS settings.
+ * WARNING: Disabled TLS settings will make the driver sending passwords as plaintext.
  */
-void void_promise_resolve(struct VoidPromise *promise);
+struct DriverOptions *driver_options_new(const struct DriverTlsConfig *tls_config);
 
 /**
- * Frees the native rust <code>VoidPromise</code> object.
+ * Frees the native rust <code>DriverOptions</code> object.
  */
-void void_promise_drop(struct VoidPromise *promise);
+void driver_options_drop(struct DriverOptions *driver_options);
 
 /**
- * Waits for and returns the result of the operation represented by the <code>BoolPromise</code> object.
- * In case the operation failed, the error flag will only be set when the promise is resolved.
- * The native promise object is freed when it is resolved.
+ * Overrides the TLS configuration on <code>DriverOptions</code>.
+ * WARNING: Disabled TLS settings will make the driver sending passwords as plaintext.
  */
-bool bool_promise_resolve(struct BoolPromise *promise);
+void driver_options_set_tls_config(struct DriverOptions *options,
+                                   const struct DriverTlsConfig *tls_config);
 
 /**
- * Frees the native rust <code>BoolPromise</code> object.
+ * Returns the TLS Config set for this <code>DriverOptions</code> object.
+ * Specifies the TLS configuration of the connection to TypeDB.
  */
-void bool_promise_drop(struct BoolPromise *promise);
+struct DriverTlsConfig *driver_options_get_tls_config(const struct DriverOptions *options);
 
 /**
- * Waits for and returns the result of the operation represented by the <code>BoolPromise</code> object.
- * In case the operation failed, the error flag will only be set when the promise is resolved.
- * The native promise object is freed when it is resolved.
+ * Sets the number of times the driver retries finding and re-routing to the primary replica
+ * on connection failures. This value is used both for polling during leader election (up to
+ * N+1 attempts with a 2-second sleep between each) and for re-executing a failed request on
+ * a newly discovered primary. Defaults to 1.
  */
-char *string_promise_resolve(struct StringPromise *promise);
+void driver_options_set_primary_failover_retries(struct DriverOptions *options,
+                                                 int64_t primary_failover_retries);
 
 /**
- * Frees the native rust <code>StringPromise</code> object.
+ * Returns the value set for the primary failover retries limit in this <code>DriverOptions</code> object.
+ * Sets the number of times the driver retries finding and re-routing to the primary replica
+ * on connection failures. This value is used both for polling during leader election (up to
+ * N+1 attempts with a 2-second sleep between each) and for re-executing a failed request on
+ * a newly discovered primary.
  */
-void string_promise_drop(struct StringPromise *promise);
+int64_t driver_options_get_primary_failover_retries(const struct DriverOptions *options);
+
+/**
+ * Sets the maximum time (in milliseconds) to wait for a response to a unary RPC request.
+ * This applies to operations like database creation, user management, and initial
+ * transaction opening. It does NOT apply to operations within transactions (queries, commits).
+ * Set to 0 to disable the timeout (not recommended for production use).
+ * Defaults to 2 hours (7200000 milliseconds).
+ */
+void driver_options_set_request_timeout_millis(struct DriverOptions *options,
+                                               int64_t timeout_millis);
+
+/**
+ * Returns the request timeout in milliseconds set for this <code>DriverOptions</code> object.
+ * Specifies the maximum time to wait for a response to a unary RPC request.
+ * This applies to operations like database creation, user management, and initial
+ * transaction opening. It does NOT apply to operations within transactions (queries, commits).
+ */
+int64_t driver_options_get_request_timeout_millis(const struct DriverOptions *options);
+
+/**
+ * Creates a new <code>DriverTlsConfig</code> with TLS disabled.
+ */
+struct DriverTlsConfig *driver_tls_config_new_disabled(void);
+
+/**
+ * Creates a new <code>DriverTlsConfig</code> with TLS enabled using system native trust roots.
+ */
+struct DriverTlsConfig *driver_tls_config_new_enabled_with_native_root_ca(void);
+
+/**
+ * Creates a new <code>DriverTlsConfig</code> with TLS enabled using a custom root CA certificate (PEM).
+ */
+struct DriverTlsConfig *driver_tls_config_new_enabled_with_root_ca_path(const char *tls_root_ca);
+
+/**
+ * Frees the native rust <code>DriverTlsConfig</code> object.
+ */
+void driver_tls_config_drop(struct DriverTlsConfig *tls_config);
+
+/**
+ * Returns whether TLS is enabled.
+ */
+bool driver_tls_config_is_enabled(const struct DriverTlsConfig *tls_config);
+
+/**
+ * Returns whether a custom root CA path is set.
+ */
+bool driver_tls_config_has_root_ca_path(const struct DriverTlsConfig *tls_config);
+
+/**
+ * Returns the TLS root CA set in this <code>DriverTlsConfig</code> object.
+ * Panics if a custom root CA is absent.
+ */
+char *driver_tls_config_get_root_ca_path(const struct DriverTlsConfig *tls_config);
 
 /**
  * Produces a new <code>QueryOptions</code> object.
@@ -1932,7 +2279,7 @@ struct QueryOptions *query_options_new(void);
 void query_options_drop(struct QueryOptions *options);
 
 /**
- * Explicitly set the "include instance types" flag.
+ * Explicitly sets the "include instance types" flag.
  * If set, specifies if types should be included in instance structs returned in ConceptRow answers.
  * This option allows reducing the amount of unnecessary data transmitted.
  */
@@ -1952,7 +2299,7 @@ bool query_options_get_include_instance_types(const struct QueryOptions *options
 bool query_options_has_include_instance_types(const struct QueryOptions *options);
 
 /**
- * Explicitly set the prefetch size.
+ * Explicitly sets the prefetch size.
  * If set, specifies the number of extra query responses sent before the client side has to re-request more responses.
  * Increasing this may increase performance for queries with a huge number of answers, as it can
  * reduce the number of network round-trips at the cost of more resources on the server side.
@@ -1993,6 +2340,79 @@ bool query_options_get_include_query_structure(const struct QueryOptions *option
 bool query_options_has_include_query_structure(const struct QueryOptions *options);
 
 /**
+ * Forwards the <code>ServerIterator</code> and returns the next <code>Server</code> if it exists,
+ * or null if there are no more elements.
+ */
+struct Server *server_iterator_next(struct ServerIterator *it);
+
+/**
+ * Frees the native rust <code>ServerIterator</code> object.
+ */
+void server_iterator_drop(struct ServerIterator *it);
+
+/**
+ * Frees the native rust <code>Server</code> object.
+ */
+void server_drop(struct Server *server_info);
+
+/**
+ * Returns the id of this server.
+ */
+int64_t server_get_id(const struct Server *server_info);
+
+/**
+ * Returns the address this server is hosted at.
+ */
+char *server_get_address(const struct Server *server_info);
+
+/**
+ * Returns whether the role of this server is set.
+ */
+bool server_has_role(const struct Server *server_info);
+
+/**
+ * Returns whether this is the primary server of the cluster or any of the supporting roles.
+ */
+enum ReplicationRole server_get_role(const struct Server *server_info);
+
+/**
+ * Checks whether this is the primary server of the cluster.
+ */
+bool server_is_primary(const struct Server *server_info);
+
+/**
+ * Returns whether the cluster protocol 'term' of this server exists.
+ */
+bool server_has_term(const struct Server *server_info);
+
+/**
+ * Returns the cluster protocol 'term' of this server.
+ */
+int64_t server_get_term(const struct Server *server_info);
+
+/**
+ * Creates an automatic <code>ServerRouting</code> object.
+ */
+struct ServerRouting *server_routing_auto(void);
+
+/**
+ * Creates a server-specific <code>ServerRouting</code> object.
+ *
+ * @param address The address of the server to route to.
+ */
+struct ServerRouting *server_routing_direct(const char *address);
+
+/**
+ * Drops the <code>ServerRouting</code> object.
+ */
+void server_routing_drop(struct ServerRouting *server_routing);
+
+/**
+ * Frees the native rust <code>ServerVersion</code> object
+ */
+void server_version_drop(struct ServerVersion *server_version);
+
+/**
  * Opens a transaction to perform read or write queries on the database connected to the session.
  *
  * @param databases The <code>DatabaseManager</code> object on this connection.
@@ -2026,12 +2446,12 @@ struct AnalyzedQueryPromise *transaction_analyze(struct Transaction *transaction
                                                  const char *query);
 
 /**
- * Closes the transaction and frees the native rust object.
+ * Closes the transaction, waits for all callbacks to complete, then frees the memory.
  */
-void transaction_submit_close(struct Transaction *txn);
+void transaction_drop_sync(struct Transaction *txn);
 
 /**
- * Forcibly closes this transaction. To be used in exceptional cases.
+ * Forcibly closes this transaction. Returns a resolvable promise.
  */
 struct VoidPromise *transaction_close(struct Transaction *txn);
 
@@ -2074,7 +2494,7 @@ struct TransactionOptions *transaction_options_new(void);
 void transaction_options_drop(struct TransactionOptions *options);
 
 /**
- * Explicitly set a transaction timeout.
+ * Explicitly sets a transaction timeout.
  * If set, specifies a timeout for killing transactions automatically, preventing memory leaks in unclosed transactions.
  */
 void transaction_options_set_transaction_timeout_millis(struct TransactionOptions *options,
@@ -2123,14 +2543,14 @@ char *user_get_name(struct User *user);
  * Updates the password for the current authenticated user.
  *
  * @param user The user to update the password of - must be the current user.
- * @param user_manager The <code>UserManager</code> object on this connection.
- * @param password_old The current password of this user
- * @param password_new The new password
+ * @param password The new password.
  */
 void user_update_password(struct User *user, const char *password);
 
 /**
- * Deletes this database.
+ * Deletes this user.
+ *
+ * @param user The <code>User</code> to delete.
  */
 void user_delete(struct User *user);
 
@@ -2141,33 +2561,46 @@ void user_delete(struct User *user);
 struct User *user_iterator_next(struct UserIterator *it);
 
 /**
- * Frees the native rust <code>UserIterator</code> object
+ * Frees the native rust <code>UserIterator</code> object.
  */
 void user_iterator_drop(struct UserIterator *it);
 
 /**
  * Retrieves all users which exist on the TypeDB server.
+ *
+ * @param driver The <code>TypeDBDriver</code> object.
  */
 struct UserIterator *users_all(const struct TypeDBDriver *driver);
 
 /**
  * Checks if a user with the given name exists.
+ *
+ * @param driver The <code>TypeDBDriver</code> object.
+ * @param username The username of the user.
  */
 bool users_contains(const struct TypeDBDriver *driver, const char *username);
 
 /**
- * Creates a user with the given name &amp; password.
- */
-void users_create(const struct TypeDBDriver *driver, const char *username, const char *password);
-
-/**
  * Retrieves a user with the given name.
+ *
+ * @param driver The <code>TypeDBDriver</code> object.
+ * @param username The username of the user.
  */
 struct User *users_get(const struct TypeDBDriver *driver, const char *username);
 
 /**
- * Retrieves the username of the user who opened this connection
+ * Retrieves the username of the user who opened this connection.
+ *
+ * @param driver The <code>TypeDBDriver</code> object.
  */
-struct User *users_get_current_user(const struct TypeDBDriver *driver);
+struct User *users_get_current(const struct TypeDBDriver *driver);
+
+/**
+ * Creates a user with the given name &amp; password.
+ *
+ * @param username The username of the created user.
+ * @param password The password of the created user.
+ */
+void users_create(const struct TypeDBDriver *driver, const char *username, const char *password);
 
 /** @file */ // Tells doxygen to document this file.
