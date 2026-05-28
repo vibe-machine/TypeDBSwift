@@ -41,7 +41,14 @@ let package = Package(
         .testTarget(
             name: "TypeDBSwiftTests",
             dependencies: ["TypeDBSwift"],
-            path: "Tests/TypeDBSwiftTests"
+            path: "Tests/TypeDBSwiftTests",
+            // Behaviour feature files are loaded by path at runtime (via
+            // #filePath), not bundled — exclude them so SwiftPM does not treat
+            // them as unhandled resources.
+            exclude: [
+                "Behaviour/features",
+                "Behaviour/README.md",
+            ]
         ),
     ]
 )
