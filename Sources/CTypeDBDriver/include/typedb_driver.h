@@ -79,6 +79,7 @@ typedef enum ConstraintVariant {
   Expression,
   Is,
   Iid,
+  DeleteConcepts,
   Comparison,
   KindOf,
   Label,
@@ -356,6 +357,38 @@ typedef struct Fetch Fetch;
 typedef struct Function Function;
 
 typedef struct FunctionIterator FunctionIterator;
+
+/**
+ * A representation of the 'given' stage of a query
+ */
+typedef struct Given Given;
+
+/**
+ * Rows of data to be used as input to a TypeQL query using a `given` stage.
+ *
+ * # Examples
+ *
+ * ```rust
+ * let query = "given $n: string, $a: integer; insert $p isa person, has name == $n, has age == $a;";
+ * let mut rows = GivenRows::new(vec!["n".to_owned(), "a".to_owned()], 1);
+ * rows.push_row(vec![GivenRowEntry::Value(Value::String("Alice".to_owned())), GivenRowEntry::Value(Value::Integer(28))]);
+ * rows.push_row(vec!["Bob".into(), 26.into()]);
+ * transaction.query_with_rows(query, rows)
+ * ```
+ */
+typedef struct GivenRows GivenRows;
+
+/**
+ * Helper type for constructing <code>GivenRows</code> instance across FFI.
+ */
+typedef struct GivenRowsBuilder GivenRowsBuilder;
+
+typedef struct GivenRowsHeader GivenRowsHeader;
+
+/**
+ * Helper type for constructing a <code>GivenRowsHeader</code> instance across FFI.
+ */
+typedef struct GivenRowsHeaderBuilder GivenRowsHeaderBuilder;
 
 /**
  * A <code>NamedRole</code> vertex is used in links & relates constraints, as multiple relations may have roles with the same name.
@@ -676,6 +709,11 @@ struct Pipeline *analyzed_query_pipeline(const struct AnalyzedQuery *analyzed_qu
 struct FunctionIterator *analyzed_preamble(const struct AnalyzedQuery *analyzed_query);
 
 /**
+ * Returns the analyzed given stage, or null if the query has no given stage.
+ */
+struct Given *analyzed_given(const struct AnalyzedQuery *analyzed_query);
+
+/**
  * Returns the analyzed fetch
  */
 struct Fetch *analyzed_fetch(const struct AnalyzedQuery *analyzed_query);
@@ -709,6 +747,17 @@ struct StringIterator *fetch_object_fields(const struct Fetch *fetch);
  */
 struct Fetch *fetch_object_get_field(const struct Fetch *fetch,
                                      const char *field);
+
+/**
+ * Returns the variables declared in the given stage.
+ */
+struct VariableIterator *given_variables(const struct Given *given);
+
+/**
+ * Returns the inferred types for the specified variable in the given stage.
+ */
+struct VariableAnnotations *given_variable_annotations(const struct Given *given,
+                                                       const struct Variable *variable);
 
 /**
  * A representation of the <code>Pipeline</code> which forms the body of the function.
@@ -1186,6 +1235,13 @@ struct ConstraintVertex *constraint_iid_get_variable(const struct ConstraintWith
 char *constraint_iid_get_iid(const struct ConstraintWithSpan *constraint);
 
 /**
+ * Unwraps the <code>Constraint</code> instance as a `DeleteConcepts` constraint,
+ * and returns the variables whose concepts are deleted.
+ * Will panic if the Constraint is not a DeleteConcepts constraint.
+ */
+struct ConstraintVertexIterator *constraint_delete_concepts_get_variables(const struct ConstraintWithSpan *constraint);
+
+/**
  * Unwraps the <code>Constraint</code> instance as a `Comparison` constraint,
  * and returns the left-hand side vertex.
  * Will panic if the Constraint is not a Comparison constraint.
@@ -1457,6 +1513,11 @@ void constraint_with_span_drop(struct ConstraintWithSpan *obj);
  *Frees the native rust <code>ConstraintVertex</code> object.
  */
 void constraint_vertex_drop(struct ConstraintVertex *obj);
+
+/**
+ *Frees the native rust <code>Given</code> object.
+ */
+void given_drop(struct Given *obj);
 
 /**
  *Frees the native rust <code>Fetch</code> object.
@@ -1950,6 +2011,72 @@ bool concept_is_value(const struct Concept *concept);
 char *concept_to_string(const struct Concept *concept);
 
 /**
+ * Creates a new <code>Concept</code> object wrapping the specified <code>bool</code> value
+ */
+struct Concept *concept_new_boolean(bool value);
+
+/**
+ * Creates a new <code>Concept</code> object wrapping the specified <code>i64</code> value
+ */
+struct Concept *concept_new_integer(int64_t value);
+
+/**
+ * Creates a new <code>Concept</code> object wrapping the specified <code>String</code> value
+ */
+struct Concept *concept_new_string(const char *value);
+
+/**
+ * Creates a new <code>Concept</code> object wrapping the specified <code>f64</code> value
+ */
+struct Concept *concept_new_double(double value);
+
+/**
+ * Creates a new <code>Concept</code> object wrapping the specified <code>Decimal</code> value,
+ * provided as a string (without the dec suffix).
+ */
+struct Concept *concept_new_decimal_from_string(const char *str);
+
+/**
+ * Creates a new <code>Concept</code> object wrapping the specified <code>Decimal</code> value,
+ * provided as its integer and fractional parts. The fractional part is in units of 10^-19.
+ */
+struct Concept *concept_new_decimal(int64_t integer, uint64_t fractional);
+
+/**
+ * Creates a new <code>Concept</code> object wrapping a specified <code>NaiveDate</code> value.
+ * The value must be seconds since the start of the UNIX epoch.
+ */
+struct Concept *concept_new_date_from_seconds(int64_t seconds_since_epoch);
+
+/**
+ * Creates a new <code>Concept</code> object wrapping the specified naive datetime value,
+ * provided as seconds and nanoseconds since the Unix epoch.
+ */
+struct Concept *concept_new_datetime(int64_t seconds, uint32_t subsec_nanos);
+
+/**
+ * Creates a new <code>Concept</code> object wrapping the specified timezone-aware datetime value
+ * with an IANA timezone name, provided as seconds and nanoseconds since the Unix epoch.
+ */
+struct Concept *concept_new_datetime_tz_iana(int64_t seconds,
+                                             uint32_t subsec_nanos,
+                                             const char *zone_name);
+
+/**
+ * Creates a new <code>Concept</code> object wrapping the specified timezone-aware datetime value
+ * with a fixed UTC offset in seconds, provided as seconds and nanoseconds since the Unix epoch.
+ */
+struct Concept *concept_new_datetime_tz_offset(int64_t seconds,
+                                               uint32_t subsec_nanos,
+                                               int32_t offset_seconds);
+
+/**
+ * Creates a new <code>Concept</code> object wrapping the specified <code>Duration</code> value,
+ * provided as its months, days, and nanoseconds components.
+ */
+struct Concept *concept_new_duration(uint32_t months, uint32_t days, uint64_t nanos);
+
+/**
  * Retrieves the type which this ``Entity`` belongs to.
  */
 struct Concept *entity_get_type(const struct Concept *entity);
@@ -2197,20 +2324,22 @@ void driver_options_set_tls_config(struct DriverOptions *options,
 struct DriverTlsConfig *driver_options_get_tls_config(const struct DriverOptions *options);
 
 /**
- * Sets the number of times the driver retries finding and re-routing to the primary replica
- * on connection failures. This value is used both for polling during leader election (up to
- * N+1 attempts with a 2-second sleep between each) and for re-executing a failed request on
- * a newly discovered primary. Defaults to 1.
+ * Specifies the number of retries the driver performs to find and reach the cluster primary
+ * after a failed request, before giving up. Total attempts per user request = <code>N + 1</code>.
+ * Each retry either follows the server's redirect address (fast path) or polls the
+ * known replicas with a 2-second sleep between polls (slow path).
+ * Set to 0 to disable failover. Defaults to 1.
  */
 void driver_options_set_primary_failover_retries(struct DriverOptions *options,
                                                  int64_t primary_failover_retries);
 
 /**
  * Returns the value set for the primary failover retries limit in this <code>DriverOptions</code> object.
- * Sets the number of times the driver retries finding and re-routing to the primary replica
- * on connection failures. This value is used both for polling during leader election (up to
- * N+1 attempts with a 2-second sleep between each) and for re-executing a failed request on
- * a newly discovered primary.
+ * Specifies the number of retries the driver performs to find and reach the cluster primary
+ * after a failed request, before giving up. Total attempts per user request = <code>N + 1</code>.
+ * Each retry either follows the server's redirect address (fast path) or polls the
+ * known replicas with a 2-second sleep between polls (slow path).
+ * Set to 0 to disable failover. Defaults to 1.
  */
 int64_t driver_options_get_primary_failover_retries(const struct DriverOptions *options);
 
@@ -2267,6 +2396,78 @@ bool driver_tls_config_has_root_ca_path(const struct DriverTlsConfig *tls_config
  * Panics if a custom root CA is absent.
  */
 char *driver_tls_config_get_root_ca_path(const struct DriverTlsConfig *tls_config);
+
+/**
+ * Creates a new <code>GivenRowsHeaderBuilder</code> of the specified capacity,
+ */
+struct GivenRowsHeaderBuilder *given_rows_header_builder_new(uintptr_t width);
+
+/**
+ * Adds a variable to the header being built by this <code>GivenRowsHeaderBuilder</code>
+ */
+void given_rows_header_builder_push(struct GivenRowsHeaderBuilder *builder, char *variable);
+
+/**
+ * Converts the builder into a finished <code>GivenRowsHeader</code> consisting of the pushed variables.
+ */
+const struct GivenRowsHeader *given_rows_header_builder_finish(struct GivenRowsHeaderBuilder *builder);
+
+/**
+ * Creates a new <code>givenRow</code> of the specified capacity,
+ */
+struct GivenRowsBuilder *given_rows_builder_new(const struct GivenRowsHeader *header,
+                                                uintptr_t row_count_hint);
+
+void given_rows_builder_start_new_row(struct GivenRowsBuilder *builder);
+
+void given_rows_builder_commit_row(struct GivenRowsBuilder *builder);
+
+struct GivenRows *given_rows_builder_finish(struct GivenRowsBuilder *builder);
+
+/**
+ * Sets the entry at `index` in the given row to the specified entity
+ */
+void given_rows_builder_set_index_to_concept(struct GivenRowsBuilder *builder,
+                                             uintptr_t index,
+                                             const struct Concept *concept);
+
+/**
+ * Sets the entry for `variable` in the given row to the specified entity
+ */
+void given_rows_builder_set_variable_to_concept(struct GivenRowsBuilder *builder,
+                                                const char *variable,
+                                                const struct Concept *concept);
+
+/**
+ * Sets the entry at `index` in the given row to the Empty Optional value
+ */
+void given_rows_builder_set_index_to_empty(struct GivenRowsBuilder *builder, uintptr_t index);
+
+/**
+ * Sets the entry for `variable` in the given row to the Empty optional value
+ */
+void given_rows_builder_set_variable_to_empty(struct GivenRowsBuilder *builder,
+                                              const char *variable);
+
+/**
+ * Frees the native rust <code>GivenRowsHeaderBuilder</code> object
+ */
+void given_rows_header_builder_drop(struct GivenRowsHeaderBuilder *builder);
+
+/**
+ * Releases this instance of the arc of the native rust <code>GivenRowsHeader</code> object
+ */
+void given_rows_header_drop(const struct GivenRowsHeader *header);
+
+/**
+ * Frees the native rust <code>GivenRowsBuilder</code> object
+ */
+void given_rows_builder_drop(struct GivenRowsBuilder *builder);
+
+/**
+ * Frees the native rust <code>QueryGivenRows</code> object
+ */
+void given_rows_drop(struct GivenRows *rows);
 
 /**
  * Produces a new <code>QueryOptions</code> object.
@@ -2435,6 +2636,19 @@ struct Transaction *transaction_new(struct TypeDBDriver *driver,
 struct QueryAnswerPromise *transaction_query(struct Transaction *transaction,
                                              const char *query,
                                              const struct QueryOptions *options);
+
+/**
+ * Performs a TypeQL query in the transaction with the given rows
+ *
+ * @param transaction The <code>Transaction</code> to execute the query within.
+ * @param query The query string.
+ * @param options <code>QueryOptions</code> to configure the executed query.
+ * @param given_rows <code>QueryGivenRows</code> the rows given as input to the query.
+ */
+struct QueryAnswerPromise *transaction_query_given_rows(struct Transaction *transaction,
+                                                        const char *query,
+                                                        const struct QueryOptions *options,
+                                                        struct GivenRows *given_rows);
 
 /**
  * Analyzes a TypeQL query in the transaction.

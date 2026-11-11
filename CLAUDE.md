@@ -6,14 +6,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 TypeDBSwift is a Swift driver for TypeDB that wraps the official TypeDB C driver via Swift C interop. Connection, database/user management, query execution, transactions, typed concepts, answer handling, and async/await are all implemented.
 
-- **Swift 5.9+**, macOS 15.5+ (the bundled TypeDB 3.11.5 C driver dylib requires a macOS 15.5+ runtime)
-- **TypeDB server 3.11.0+** required for integration tests (default: `localhost:1729`, credentials `admin`/`password`). The 3.11 wire protocol rejects older clients, and a 3.11 client cannot connect to a pre-3.11 server.
+- **Swift 5.9+**, macOS 15.5+ (the bundled TypeDB 3.14.0 C driver dylib requires a macOS 15.5+ runtime)
+- The bundled driver release is **3.14.0**, with official source pinned at `2e4d2dceecb6d9c92e36893b64b74157921aef85`. OneWorkspace targets the separate **TypeDB server 3.14.2** release train. Integration tests default to `localhost:1729`, credentials `admin`/`password`; runtime compatibility still needs qualification.
 
 ## Build & Test Commands
 
 ```bash
 # Fetch pre-built C driver (required before first build)
 ./scripts/fetch-driver.sh
+# Default archive is SHA-256 pinned; other platforms/versions require a trusted
+# TYPEDB_DRIVER_ARCHIVE_SHA256. The artifact manifest records installed hashes.
 
 # Build
 swift build
@@ -52,7 +54,21 @@ All C interop goes through `OpaquePointer` handles. The pattern throughout the c
 1. Call a C function that returns an `OpaquePointer?`
 2. Check for `nil` return, call `TypeDBError.checkAndThrow()` to consume any C-side error
 3. Use `defer` for cleanup (`*_drop()` functions)
-4. C strings returned by the driver must be freed with `string_free()` (except `database_get_name` which is owned by the database)
+4. C strings returned by the driver must be freed with `string_free()`.
+
+Driver 3.14 returns owned strings from `database_get_name` too: free those with
+`string_free()`. Database iterator/get references require `database_close` unless
+consumed by `database_delete`; user deletion also consumes its native handle.
+
+Async FFI uses `DriverBlockingExecutor` with four admitted worker operations,
+at default QoS. Pending work owns no worker thread. A transaction and all its
+iterators share one exclusive gate; independent transactions may overlap.
+Synchronous APIs remain blocking and share handle gates and driver lifetime
+leases. C calls, promise resolution and TLS error extraction stay on one thread.
+Driver close rejects new leases and drains executing calls before freeing the
+native box. Queued cancellation removes pending work; running FFI is not
+preempted by task cancellation. This bounds concurrency without reserving a
+foreground worker or changing plugin scheduling policy.
 
 ### Key Types
 

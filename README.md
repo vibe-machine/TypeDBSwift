@@ -29,11 +29,11 @@ The C driver dylib must be available at runtime. See [Runtime Library Path](#run
 
 ## Requirements
 
-- macOS 13.0+ to build; the bundled TypeDB 3.11.5 C driver dylib requires a
+- macOS 13.0+ to build; the bundled TypeDB 3.14.0 C driver dylib requires a
   macOS 15.5+ runtime
 - Swift 5.9+
-- TypeDB server 3.11.0+ (the 3.11 wire protocol rejects older clients, and a
-  3.11 client cannot connect to a pre-3.11 server)
+- TypeDB driver 3.14.0; OneWorkspace targets server 3.14.2, which follows a
+  separate release train. This cohort still requires runtime qualification.
 
 ## Quick Start
 
@@ -130,7 +130,8 @@ TypeDB server, enforcing the spec's `; fails` / `; parsing fails` expectations.
 Upstream ignore tags (`@ignore`, `@ignore-typedb-driver[-swift]`) are honored,
 while scenarios tagged only for other drivers still run.
 
-Current status: **all 63 vendored scenarios pass** against TypeDB 3.11. They run
+Historical baseline: **all 63 vendored scenarios passed** against TypeDB 3.11.
+The 3.14 cohort has not been executed or qualified. These scenarios run
 as part of `./scripts/test.sh` (and `--integration`); the runner deletes all
 databases when the connection opens to establish the spec's clean-slate
 precondition, so point it at a dedicated test server. See the

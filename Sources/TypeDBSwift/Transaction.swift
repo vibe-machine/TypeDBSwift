@@ -46,13 +46,14 @@ public enum QueryAnswer: Sendable {
 /// ``rollback()``; either finalizes the transaction. A transaction that is
 /// dropped without being finalized is closed automatically.
 ///
-/// - Important: The C driver is not thread-safe. Every C call this type makes is
-///   serialized onto the driver's private queue, so a `Transaction` is safe to
-///   pass between tasks, but its queries execute one at a time.
+/// - Important: This transaction and its streams share an exclusive gate.
+///   Calls on this handle execute one at a time, while independent transactions
+///   can overlap within the driver's bounded blocking executor.
 public final class Transaction: @unchecked Sendable {
     /// The transaction's type.
     public let type: TransactionType
 
+    let operationGate = DriverOperationGate()
     private var pointer: OpaquePointer?
     // Keeps the owning driver alive for the transaction's lifetime.
     private let driver: TypeDBDriver
@@ -65,21 +66,24 @@ public final class Transaction: @unchecked Sendable {
 
     deinit {
         guard let ptr = pointer else { return }
-        // OpaquePointer is not Sendable; pass it across the queue as a bit
-        // pattern so the cleanup closure stays Sendable (Swift 6 friendly).
         let raw = UInt(bitPattern: ptr)
-        dispatchCleanup {
+        let owner = driver
+        dispatchCleanup(serializing: operationGate) {
             guard let ptr = OpaquePointer(bitPattern: raw) else { return }
-            if let closePromise = transaction_close(ptr) {
-                void_promise_resolve(closePromise)
-            }
+            transaction_drop_sync(ptr)
+            _ = TypeDBError.getLastError()
+            withExtendedLifetime(owner) {}
         }
     }
 
     /// Whether the transaction is still open on the server.
     public var isOpen: Bool {
-        guard let ptr = pointer else { return false }
-        return transaction_is_open(ptr)
+        (try? driver.withOperation {
+            operationGate.withLock {
+                guard let ptr = pointer else { return false }
+                return transaction_is_open(ptr)
+            }
+        }) ?? false
     }
 
     /// Execute a TypeQL query within this transaction.
@@ -88,14 +92,22 @@ public final class Transaction: @unchecked Sendable {
     /// underlying server-side iterator stays open until the stream is consumed
     /// (or the answer is released). The stream is single-pass.
     public func query(_ query: String) async throws -> QueryAnswer {
-        try await dispatchBlocking { [self] in
+        try await perform { [self] in
             try self.queryOnQueue(query)
+        }
+    }
+
+    /// Supplies native typed values to the query's given declarations. The
+    /// transaction/stream gate and TLS error boundary are identical to query().
+    public func query(_ query: String, givenRows: TypeDBGivenRows) async throws -> QueryAnswer {
+        try await perform { [self] in
+            try self.queryOnQueue(query, givenRows: givenRows)
         }
     }
 
     /// Commit the transaction. Only valid for write/schema transactions.
     public func commit() async throws {
-        try await dispatchBlockingVoid { [self] in
+        try await perform { [self] in
             guard let ptr = self.takePointer() else {
                 throw TypeDBError(code: "TX_CLOSED", message: "Transaction is already finalized")
             }
@@ -110,9 +122,13 @@ public final class Transaction: @unchecked Sendable {
 
     /// Roll back the transaction, discarding any uncommitted changes.
     public func rollback() async throws {
-        try await dispatchBlockingVoid { [self] in
-            guard let ptr = self.pointer else {
+        try await perform { [self] in
+            guard let ptr = self.takePointer() else {
                 throw TypeDBError(code: "TX_CLOSED", message: "Transaction is already finalized")
+            }
+            defer {
+                transaction_drop_sync(ptr)
+                _ = TypeDBError.getLastError()
             }
             guard let promise = transaction_rollback(ptr) else {
                 try TypeDBError.checkAndThrow()
@@ -125,25 +141,48 @@ public final class Transaction: @unchecked Sendable {
 
     /// Close the transaction without committing. Idempotent.
     public func close() async throws {
-        try await dispatchBlockingVoid { [self] in
+        // The transaction owns its allocation independently of the driver box;
+        // explicit cleanup remains possible after the driver has been closed.
+        try await dispatchBlockingVoid(serializing: operationGate) { [self] in
             guard let ptr = self.takePointer() else { return }
+            defer {
+                transaction_drop_sync(ptr)
+                _ = TypeDBError.getLastError()
+            }
             if let promise = transaction_close(ptr) {
                 void_promise_resolve(promise)
             }
+            try TypeDBError.checkAndThrow()
         }
     }
 
-    // MARK: - Driver-queue internals
+    /// The executor gate and sync status queries share one lock. Driver close
+    /// waits only for admitted operations holding this lifetime lease.
+    fileprivate func perform<T: Sendable>(
+        _ operation: @escaping @Sendable () throws -> T
+    ) async throws -> T {
+        try await dispatchBlocking(serializing: operationGate) { [self] in
+            try self.driver.withOperation { try self.operationGate.withLock(operation) }
+        }
+    }
+
+    fileprivate func requireOpen() throws {
+        guard pointer != nil else {
+            throw TypeDBError(code: "TX_CLOSED", message: "Transaction is already finalized")
+        }
+    }
+
+    // MARK: - Transaction-gate internals
 
     /// Atomically take the pointer, leaving the transaction finalized. Must run
-    /// on the driver queue (serialization makes the read/clear race-free).
+    /// under the transaction gate (the read/clear is exclusive).
     private func takePointer() -> OpaquePointer? {
         let ptr = pointer
         pointer = nil
         return ptr
     }
 
-    private func queryOnQueue(_ query: String) throws -> QueryAnswer {
+    private func queryOnQueue(_ query: String, givenRows: TypeDBGivenRows? = nil) throws -> QueryAnswer {
         guard let ptr = pointer else {
             throw TypeDBError(code: "TX_CLOSED", message: "Transaction is already finalized")
         }
@@ -153,7 +192,11 @@ public final class Transaction: @unchecked Sendable {
         }
         defer { query_options_drop(queryOptions) }
 
-        guard let promise = transaction_query(ptr, query, queryOptions) else {
+        guard !query.utf8.contains(0) else {
+            throw TypeDBError(code: "INVALID_GIVEN_ROWS", message: "Query text cannot contain a NUL byte")
+        }
+        let request: TypeDBQueryRequest = givenRows.map { .givenRows(query: query, rows: $0) } ?? .typeql(query)
+        guard let promise = try request.submit(transaction: ptr, options: queryOptions) else {
             try TypeDBError.checkAndThrow()
             throw TypeDBError(code: "QUERY_SUBMIT_FAILED", message: "Failed to submit query")
         }
@@ -198,6 +241,7 @@ public extension TypeDBDriver {
     /// - Returns: An open ``Transaction``.
     func transaction(_ type: TransactionType, database: String) async throws -> Transaction {
         try await dispatchBlocking { [self] in
+            try self.withOperation {
             guard let driverPtr = self.cPointer else {
                 throw TypeDBError(code: "DRIVER_CLOSED", message: "Driver connection is closed")
             }
@@ -211,6 +255,7 @@ public extension TypeDBDriver {
                 throw TypeDBError(code: "TX_OPEN_FAILED", message: "Failed to open transaction on '\(database)'")
             }
             return Transaction(pointer: txPtr, type: type, driver: self)
+            }
         }
     }
 }
@@ -267,14 +312,18 @@ final class RowIteratorBox: @unchecked Sendable {
     deinit {
         guard let it = iterator else { return }
         let raw = UInt(bitPattern: it)
-        dispatchCleanup {
+        let owner = transaction
+        dispatchCleanup(serializing: transaction.operationGate) {
             guard let it = OpaquePointer(bitPattern: raw) else { return }
             concept_row_iterator_drop(it)
+            _ = TypeDBError.getLastError()
+            withExtendedLifetime(owner) {}
         }
     }
 
     func next() async throws -> ConceptRow? {
-        try await dispatchBlocking { [self] in
+        try await transaction.perform { [self] in
+            try self.transaction.requireOpen()
             guard let it = self.iterator else { return nil }
             guard let cRow = concept_row_iterator_next(it) else {
                 try TypeDBError.checkAndThrow()
@@ -335,14 +384,18 @@ final class DocumentIteratorBox: @unchecked Sendable {
     deinit {
         guard let it = iterator else { return }
         let raw = UInt(bitPattern: it)
-        dispatchCleanup {
+        let owner = transaction
+        dispatchCleanup(serializing: transaction.operationGate) {
             guard let it = OpaquePointer(bitPattern: raw) else { return }
             string_iterator_drop(it)
+            _ = TypeDBError.getLastError()
+            withExtendedLifetime(owner) {}
         }
     }
 
     func next() async throws -> ConceptDocument? {
-        try await dispatchBlocking { [self] in
+        try await transaction.perform { [self] in
+            try self.transaction.requireOpen()
             guard let it = self.iterator else { return nil }
             guard let docPtr = string_iterator_next(it) else {
                 try TypeDBError.checkAndThrow()

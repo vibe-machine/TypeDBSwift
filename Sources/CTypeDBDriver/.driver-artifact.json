@@ -1,0 +1,10 @@
+{
+  "version": "3.14.0",
+  "platform": "mac-arm64",
+  "sourceRevision": "2e4d2dceecb6d9c92e36893b64b74157921aef85",
+  "archiveSHA256": "4451f35534e9c00fb509ad585ff8ab6a09a3949b72a96ac84ba711fc5617377e",
+  "headerSHA256": "a432acc6f72f08b339e005566a004c80e8ef7e1dfec2f6bedd9aef1a6f23a8a7",
+  "releasedLibrarySHA256": "3ff5d45af976f564d888c7acadc9be8fc19e61cbf683f2efbdc6ca00a4c6ea13",
+  "normalizedLibrarySHA256": "a17cf0bb1c9d02cdbfb40f7298025144b0380f5f839d1b354f3b6c4cc301d1e6",
+  "normalization": "@rpath install name; ad-hoc signature refreshed"
+}

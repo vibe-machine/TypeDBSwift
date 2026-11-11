@@ -2,7 +2,7 @@ import CTypeDBDriver
 import Foundation
 
 /// Configuration options for connecting to TypeDB.
-public struct TypeDBDriverOptions {
+public struct TypeDBDriverOptions: Sendable {
     /// Whether TLS is enabled for the connection.
     public var tlsEnabled: Bool
 
@@ -16,7 +16,7 @@ public struct TypeDBDriverOptions {
 }
 
 /// Credentials for authenticating with TypeDB.
-public struct TypeDBCredentials {
+public struct TypeDBCredentials: Sendable {
     public var username: String
     public var password: String
 
@@ -37,21 +37,34 @@ public struct TypeDBCredentials {
 ///
 /// let databases = try driver.databases.all()
 /// ```
-public final class TypeDBDriver {
-    private var pointer: OpaquePointer?
+public final class TypeDBDriver: @unchecked Sendable {
+    private let lifetime: DriverLifetime
+    private let managerLock = NSLock()
+    private var databaseManager: DatabaseManager?
+    private var userManager: UserManager?
 
     /// The database manager for this connection.
-    public private(set) lazy var databases: DatabaseManager = {
-        DatabaseManager(driver: self)
-    }()
+    public var databases: DatabaseManager {
+        managerLock.withLock {
+            if let databaseManager { return databaseManager }
+            let manager = DatabaseManager(driver: self)
+            databaseManager = manager
+            return manager
+        }
+    }
 
     /// The user manager for this connection.
-    public private(set) lazy var users: UserManager = {
-        UserManager(driver: self)
-    }()
+    public var users: UserManager {
+        managerLock.withLock {
+            if let userManager { return userManager }
+            let manager = UserManager(driver: self)
+            userManager = manager
+            return manager
+        }
+    }
 
     private init(pointer: OpaquePointer) {
-        self.pointer = pointer
+        self.lifetime = DriverLifetime(pointer: pointer)
     }
 
     deinit {
@@ -124,30 +137,32 @@ public final class TypeDBDriver {
 
     /// Check if the driver connection is still open.
     public var isOpen: Bool {
-        guard let ptr = pointer else { return false }
-        return driver_is_open(ptr)
+        (try? withOperation {
+            guard let ptr = cPointer else { return false }
+            return driver_is_open(ptr)
+        }) ?? false
     }
 
     /// Close the driver connection.
     ///
     /// This method is idempotent and safe to call multiple times.
     public func close() {
-        guard let ptr = pointer else { return }
-        driver_close(ptr)
-        pointer = nil
+        lifetime.close()
     }
 
     /// Force close the driver connection, aborting any pending operations.
     public func forceClose() {
-        guard let ptr = pointer else { return }
-        driver_force_close(ptr)
-        pointer = nil
+        lifetime.close(force: true)
     }
 
     // MARK: - Internal
 
     /// Get the underlying C pointer for use by other wrapper types.
     internal var cPointer: OpaquePointer? {
-        pointer
+        lifetime.borrowedPointer
+    }
+
+    internal func withOperation<T>(_ operation: () throws -> T) throws -> T {
+        try lifetime.withLease(operation)
     }
 }

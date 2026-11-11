@@ -9,17 +9,14 @@
 #   ./scripts/fetch-driver.sh [version] [platform]
 #
 # Examples:
-#   ./scripts/fetch-driver.sh                     # Uses defaults (3.11.5, mac-arm64)
-#   ./scripts/fetch-driver.sh 3.11.5              # Specific version
-#   ./scripts/fetch-driver.sh 3.11.5 mac-arm64    # Specific version and platform
-#   ./scripts/fetch-driver.sh 3.11.5 mac-x86_64   # Intel Mac
-#   ./scripts/fetch-driver.sh 3.11.5 linux-arm64  # Linux ARM64
-#   ./scripts/fetch-driver.sh 3.11.5 linux-x86_64 # Linux x86_64
+#   ./scripts/fetch-driver.sh                     # Pinned 3.14.0, mac-arm64
+# Other versions/platforms require TYPEDB_DRIVER_ARCHIVE_SHA256 from a trusted
+# release inventory. The download is verified before installed files change.
 
 set -euo pipefail
 
 # Configuration
-DEFAULT_VERSION="3.11.5"
+DEFAULT_VERSION="3.14.0"
 DEFAULT_PLATFORM="mac-arm64"
 
 VERSION="${1:-$DEFAULT_VERSION}"
@@ -30,7 +27,25 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DRIVER_DIR="$PROJECT_ROOT/Sources/CTypeDBDriver"
 INCLUDE_DIR="$DRIVER_DIR/include"
 LIB_DIR="$DRIVER_DIR/lib"
-TEMP_DIR="$PROJECT_ROOT/.tmp-driver-download"
+TEMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/typedbswift-driver.XXXXXX")"
+trap 'rm -rf "$TEMP_DIR"' EXIT
+
+EXPECTED_SHA256="${TYPEDB_DRIVER_ARCHIVE_SHA256:-}"
+SOURCE_REVISION="unrecorded"
+if [[ "$VERSION" = "3.14.0" ]]; then
+  SOURCE_REVISION="2e4d2dceecb6d9c92e36893b64b74157921aef85"
+  if [[ "$PLATFORM" = "mac-arm64" && -z "$EXPECTED_SHA256" ]]; then
+    EXPECTED_SHA256="4451f35534e9c00fb509ad585ff8ab6a09a3949b72a96ac84ba711fc5617377e"
+  fi
+fi
+if [[ ! "$EXPECTED_SHA256" =~ ^[[:xdigit:]]{64}$ ]]; then
+  echo "Error: supply a trusted TYPEDB_DRIVER_ARCHIVE_SHA256 for $VERSION ($PLATFORM)." >&2
+  exit 1
+fi
+case "$PLATFORM" in
+  mac-arm64|mac-x86_64|linux-arm64|linux-x86_64|windows-x86_64) ;;
+  *) echo "Error: unsupported platform: $PLATFORM" >&2; exit 1 ;;
+esac
 
 # TypeDB artifact URL
 BASE_URL="https://repo.typedb.com/public/public-release/raw/names"
@@ -53,6 +68,10 @@ if ! command -v unzip &> /dev/null; then
     echo "Error: unzip is required but not installed."
     exit 1
 fi
+if ! command -v shasum &> /dev/null; then
+  echo "Error: shasum is required to verify the released artifact." >&2
+  exit 1
+fi
 
 # Create directories
 mkdir -p "$INCLUDE_DIR" "$LIB_DIR" "$TEMP_DIR"
@@ -73,6 +92,8 @@ if ! curl -fL -o "$ARTIFACT_ZIP" "$ARTIFACT_URL"; then
     exit 1
 fi
 
+printf '%s  %s\n' "$EXPECTED_SHA256" "$ARTIFACT_ZIP" | shasum -a 256 -c -
+
 # Extract
 echo "Extracting..."
 EXTRACT_DIR="$TEMP_DIR/extracted"
@@ -87,7 +108,7 @@ if [[ -z "$HEADER_FILE" ]]; then
     rm -rf "$TEMP_DIR"
     exit 1
 fi
-cp "$HEADER_FILE" "$INCLUDE_DIR/typedb_driver.h"
+HEADER_SHA256="$(shasum -a 256 "$HEADER_FILE" | awk '{print $1}')"
 
 # Find and copy library file
 echo "Installing library..."
@@ -99,11 +120,15 @@ case "$PLATFORM" in
             rm -rf "$TEMP_DIR"
             exit 1
         fi
-        cp "$DYLIB_FILE" "$LIB_DIR/libtypedb_driver_clib.dylib"
+        RELEASED_LIBRARY_SHA256="$(shasum -a 256 "$DYLIB_FILE" | awk '{print $1}')"
+        LIBRARY_FILE="$DYLIB_FILE"
+        LIBRARY_NAME="libtypedb_driver_clib.dylib"
 
         # Fix the install name (Bazel builds have a weird path)
         echo "Fixing dylib install name..."
-        install_name_tool -id "@rpath/libtypedb_driver_clib.dylib" "$LIB_DIR/libtypedb_driver_clib.dylib"
+        install_name_tool -id "@rpath/libtypedb_driver_clib.dylib" "$LIBRARY_FILE"
+        # Mach-O load-command edits invalidate the release's existing signature.
+        codesign --force --sign - --timestamp=none "$LIBRARY_FILE"
         ;;
     linux-*)
         SO_FILE=$(find "$EXTRACT_DIR" -name "*.so" | head -1)
@@ -112,7 +137,9 @@ case "$PLATFORM" in
             rm -rf "$TEMP_DIR"
             exit 1
         fi
-        cp "$SO_FILE" "$LIB_DIR/libtypedb_driver_clib.so"
+        RELEASED_LIBRARY_SHA256="$(shasum -a 256 "$SO_FILE" | awk '{print $1}')"
+        LIBRARY_FILE="$SO_FILE"
+        LIBRARY_NAME="libtypedb_driver_clib.so"
         ;;
     windows-*)
         DLL_FILE=$(find "$EXTRACT_DIR" -name "*.dll" | head -1)
@@ -121,9 +148,26 @@ case "$PLATFORM" in
             rm -rf "$TEMP_DIR"
             exit 1
         fi
-        cp "$DLL_FILE" "$LIB_DIR/typedb_driver_clib.dll"
+        RELEASED_LIBRARY_SHA256="$(shasum -a 256 "$DLL_FILE" | awk '{print $1}')"
+        LIBRARY_FILE="$DLL_FILE"
+        LIBRARY_NAME="typedb_driver_clib.dll"
         ;;
 esac
+cp "$LIBRARY_FILE" "$LIB_DIR/$LIBRARY_NAME"
+cp "$HEADER_FILE" "$INCLUDE_DIR/typedb_driver.h"
+NORMALIZED_LIBRARY_SHA256="$(shasum -a 256 "$LIBRARY_FILE" | awk '{print $1}')"
+
+cat > "$DRIVER_DIR/.driver-artifact.json" <<EOF
+{
+  "version": "$VERSION",
+  "platform": "$PLATFORM",
+  "sourceRevision": "$SOURCE_REVISION",
+  "archiveSHA256": "$EXPECTED_SHA256",
+  "headerSHA256": "$HEADER_SHA256",
+  "releasedLibrarySHA256": "$RELEASED_LIBRARY_SHA256",
+  "normalizedLibrarySHA256": "$NORMALIZED_LIBRARY_SHA256"
+}
+EOF
 
 # Create module map if it doesn't exist
 if [[ ! -f "$INCLUDE_DIR/module.modulemap" ]]; then

@@ -5,7 +5,7 @@ import PackageDescription
 let package = Package(
     name: "TypeDBSwift",
     platforms: [
-        // The bundled TypeDB 3.11.5 C driver dylib is built for a macOS 15.5+
+        // The bundled TypeDB 3.14.0 C driver dylib is built for a macOS 15.5+
         // runtime, so that is the effective minimum for this package. (String
         // form because `.v15` requires swift-tools-version 6.0.)
         .macOS("15.5")

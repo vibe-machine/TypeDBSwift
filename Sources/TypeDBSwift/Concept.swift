@@ -133,8 +133,8 @@ extension Concept {
     /// type, or an attribute's value) are owned by this function and dropped
     /// before returning.
     ///
-    /// - Important: TypeDB's C driver is not thread-safe; this must run on the
-    ///   driver's serial queue (it is only ever called from `Transaction`).
+    /// - Important: This must run while holding the owning transaction's gate,
+    ///   on the same worker as its C calls and thread-local error extraction.
     static func decode(_ cConcept: OpaquePointer) -> Concept {
         if concept_is_entity_type(cConcept) {
             return .entityType(label: copyLabel(cConcept))

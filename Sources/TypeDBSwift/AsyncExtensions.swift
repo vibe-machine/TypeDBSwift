@@ -1,55 +1,26 @@
 import Foundation
 
-// MARK: - Serial dispatch queue for C driver calls
-
-/// A dedicated serial queue that serializes all blocking C driver operations.
-///
-/// The TypeDB C driver is not thread-safe and its error handling uses global
-/// (thread-local) state. A serial queue guarantees that only one C call
-/// executes at a time, prevents thread explosion from concurrent async callers,
-/// and keeps blocking work off the Swift cooperative thread pool.
-///
-/// Modeled after GRDB's `SerializedDatabase` pattern — one serial queue per
-/// driver connection. Because we typically run a single connection and the
-/// C error state is global, a module-level queue is the right granularity.
-private let driverQueue = DispatchQueue(label: "com.typedbswift.driver", qos: .userInitiated)
-
-// MARK: - Async dispatch helpers
-
-/// Dispatches a blocking C driver operation on the dedicated serial queue.
-internal func dispatchBlocking<T: Sendable>(_ operation: @escaping @Sendable () throws -> T) async throws -> T {
-    try await withCheckedThrowingContinuation { continuation in
-        driverQueue.async {
-            do {
-                let result = try operation()
-                continuation.resume(returning: result)
-            } catch {
-                continuation.resume(throwing: error)
-            }
-        }
-    }
+// Blocking FFI never runs on Swift's cooperative pool. Admission is bounded
+// before dispatch, and transaction/stream jobs share a per-handle gate.
+internal func dispatchBlocking<T: Sendable>(
+    serializing gate: DriverOperationGate? = nil,
+    _ operation: @escaping @Sendable () throws -> T
+) async throws -> T {
+    try await DriverBlockingExecutor.shared.submit(serializing: gate, operation)
 }
 
-internal func dispatchBlockingVoid(_ operation: @escaping @Sendable () throws -> Void) async throws {
-    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-        driverQueue.async {
-            do {
-                try operation()
-                continuation.resume()
-            } catch {
-                continuation.resume(throwing: error)
-            }
-        }
-    }
+internal func dispatchBlockingVoid(
+    serializing gate: DriverOperationGate? = nil,
+    _ operation: @escaping @Sendable () throws -> Void
+) async throws {
+    try await DriverBlockingExecutor.shared.submit(serializing: gate, operation)
 }
 
-/// Fire-and-forget cleanup on the driver's serial queue.
-///
-/// Used to drop C resources (iterators, transactions) from `deinit`, which
-/// cannot `await`. Serializing through the same queue keeps these drops ordered
-/// against all other C calls.
-internal func dispatchCleanup(_ operation: @escaping @Sendable () -> Void) {
-    driverQueue.async(execute: operation)
+internal func dispatchCleanup(
+    serializing gate: DriverOperationGate? = nil,
+    _ operation: @escaping @Sendable () -> Void
+) {
+    DriverBlockingExecutor.shared.cleanup(serializing: gate, operation)
 }
 
 // MARK: - TypeDBDriver + Async
@@ -83,6 +54,30 @@ extension TypeDBDriver {
             )
         }
     }
+    /// Execute a batch as one admitted operation with an independent transaction.
+    public func query(
+        _ queries: [String],
+        database: String,
+        transactionType: TypeDBQueryTransactionType,
+        commit: Bool? = nil
+    ) async throws -> TypeDBDriverQueryResult {
+        try await dispatchBlocking {
+            try self.query(
+                queries, database: database, transactionType: transactionType, commit: commit)
+        }
+    }
+
+    public func query(
+        _ requests: [TypeDBQueryRequest],
+        database: String,
+        transactionType: TypeDBQueryTransactionType,
+        commit: Bool? = nil
+    ) async throws -> TypeDBDriverQueryResult {
+        try await dispatchBlocking {
+            try self.query(requests, database: database, transactionType: transactionType, commit: commit)
+        }
+    }
+
 }
 
 // MARK: - DatabaseManager + Async
@@ -118,6 +113,13 @@ extension DatabaseManager {
     public func importFromFile(name: String, schema: String, dataFilePath: String) async throws {
         try await dispatchBlockingVoid { try self.importFromFile(name: name, schema: schema, dataFilePath: dataFilePath) }
     }
+    /// Import migration records without blocking the cooperative executor.
+    public func importFromRecords(name: String, export: TypeDBMigrationExport) async throws {
+        try await dispatchBlockingVoid {
+            try self.importFromRecords(name: name, export: export)
+        }
+    }
+
 }
 
 // MARK: - Database + Async
@@ -126,23 +128,28 @@ extension Database {
 
     /// Delete this database.
     public func delete() async throws {
-        try await dispatchBlockingVoid { try self.delete() }
+        try await dispatchBlockingVoid(serializing: operationGate) { try self.delete() }
     }
 
     /// Export this database to schema and data files.
     public func exportToFile(schemaFilePath: String, dataFilePath: String) async throws {
-        try await dispatchBlockingVoid { try self.exportToFile(schemaFilePath: schemaFilePath, dataFilePath: dataFilePath) }
+        try await dispatchBlockingVoid(serializing: operationGate) { try self.exportToFile(schemaFilePath: schemaFilePath, dataFilePath: dataFilePath) }
     }
 
     /// The full schema as a valid TypeQL define query string.
     public func schema() async throws -> String {
-        try await dispatchBlocking { try self.schema() as String }
+        try await dispatchBlocking(serializing: operationGate) { try self.schema() as String }
     }
 
     /// The types in the schema as a valid TypeQL define query string.
     public func typeSchema() async throws -> String {
-        try await dispatchBlocking { try self.typeSchema() as String }
+        try await dispatchBlocking(serializing: operationGate) { try self.typeSchema() as String }
     }
+    /// Export migration records while holding this database's exclusive gate.
+    public func exportRecords() async throws -> TypeDBMigrationExport {
+        try await dispatchBlocking(serializing: operationGate) { try self.exportRecords() }
+    }
+
 }
 
 // MARK: - UserManager + Async
@@ -186,11 +193,11 @@ extension User {
 
     /// Update this user's password.
     public func updatePassword(to newPassword: String) async throws {
-        try await dispatchBlockingVoid { try self.updatePassword(to: newPassword) }
+        try await dispatchBlockingVoid(serializing: operationGate) { try self.updatePassword(to: newPassword) }
     }
 
     /// Delete this user.
     public func delete() async throws {
-        try await dispatchBlockingVoid { try self.delete() }
+        try await dispatchBlockingVoid(serializing: operationGate) { try self.delete() }
     }
 }
